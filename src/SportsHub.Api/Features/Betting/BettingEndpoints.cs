@@ -96,6 +96,7 @@ public static class BettingEndpoints
         group.MapPut("/platforms/{id:guid}", UpdatePlatformAsync).RequireAuthorization("AdminOnly").ValidateAntiforgery();
         group.MapPost("/sources", CreateSourceAsync).ValidateAntiforgery();
         group.MapPut("/sources/{id:guid}", UpdateSourceAsync).ValidateAntiforgery();
+        group.MapBetCsvImportEndpoints();
         return endpoints;
     }
 

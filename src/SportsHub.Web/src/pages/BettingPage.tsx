@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { useAuth } from '../auth/AuthProvider'
 import { BetForm } from '../features/betting/BetForm'
+import { BetCsvImporter } from '../features/betting/BetCsvImporter'
 import { LookupManager } from '../features/betting/LookupManager'
 import { SettleDialog } from '../features/betting/SettleDialog'
 import type { Bet, BetInput, BettingLookups, BetListResponse, BetStatus, BetTiming } from '../features/betting/types'
@@ -28,6 +29,7 @@ export function BettingPage() {
   const [formBet, setFormBet] = useState<Bet | null | undefined>(undefined)
   const [settling, setSettling] = useState<Bet | null>(null)
   const [managing, setManaging] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [actionError, setActionError] = useState('')
   const pageSize = viewMode === 'compact' ? 100 : 20
@@ -66,7 +68,7 @@ export function BettingPage() {
   return <section>
     <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
       <div><p className="text-xs font-bold uppercase tracking-[.22em] text-emerald-300 sm:text-sm">Sports betting</p><h1 className="mt-2 text-4xl font-black tracking-tight md:text-5xl">Bet tracker</h1><p className="mt-3 max-w-2xl text-sm text-slate-400 sm:text-base">Capture the offer, settle the result, and understand the numbers behind every entry.</p></div>
-      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"><div className="col-span-2 flex rounded-xl border border-white/15 bg-white/5 p-1 sm:col-span-1" aria-label="Bet list view"><button className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${viewMode === 'comfortable' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`} onClick={() => { setViewMode('comfortable'); setFilter('page', 1) }}>Comfortable</button><button className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${viewMode === 'compact' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`} onClick={() => { setViewMode('compact'); setFilter('page', 1) }}>Compact</button></div><button className={secondaryButton} onClick={() => setManaging(true)}><span className="sm:hidden">Manage</span><span className="hidden sm:inline">{canManagePlatforms ? 'Manage platforms & sources' : 'Manage sources'}</span></button><button className={primaryButton} onClick={addBet}>+ Add bet</button></div>
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"><div className="col-span-2 flex rounded-xl border border-white/15 bg-white/5 p-1 sm:col-span-1" aria-label="Bet list view"><button className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${viewMode === 'comfortable' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`} onClick={() => { setViewMode('comfortable'); setFilter('page', 1) }}>Comfortable</button><button className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${viewMode === 'compact' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`} onClick={() => { setViewMode('compact'); setFilter('page', 1) }}>Compact</button></div>{canManagePlatforms && <button className={secondaryButton} onClick={() => setImporting(true)}>Import CSV</button>}<button className={secondaryButton} onClick={() => setManaging(true)}><span className="sm:hidden">Manage</span><span className="hidden sm:inline">{canManagePlatforms ? 'Manage platforms & sources' : 'Manage sources'}</span></button><button className={primaryButton} onClick={addBet}>+ Add bet</button></div>
     </div>
 
     <div className="mt-6 grid grid-cols-2 gap-2 sm:mt-8 sm:gap-3 xl:grid-cols-4">
@@ -105,6 +107,7 @@ export function BettingPage() {
     {formBet !== undefined && lookups.data && <BetForm bet={formBet} lookups={lookups.data} saving={saveBet.isPending} onClose={() => setFormBet(undefined)} onSave={input => saveBet.mutateAsync({ bet: formBet, input }).then(() => undefined)} />}
     {settling && <SettleDialog bet={settling} saving={settleBet.isPending} onClose={() => setSettling(null)} onSave={input => settleBet.mutateAsync({ bet: settling, input }).then(() => undefined)} />}
     {managing && lookups.data && <LookupManager lookups={lookups.data} canManagePlatforms={canManagePlatforms} onClose={() => setManaging(false)} />}
+    {importing && canManagePlatforms && <BetCsvImporter onClose={() => setImporting(false)} />}
   </section>
 }
 
