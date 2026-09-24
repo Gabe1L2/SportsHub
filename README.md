@@ -38,14 +38,15 @@ dotnet tool restore
 dotnet ef database update --project src/SportsHub.Infrastructure --startup-project src/SportsHub.Api
 ```
 
-Run the API and Vite server in separate terminals:
+In Visual Studio, set `SportsHub.Api` as the startup project, select the `https` profile, and press **F5**. The ASP.NET SPA proxy starts Vite automatically and opens the application.
+
+The equivalent command-line workflow is:
 
 ```powershell
 dotnet run --project src/SportsHub.Api --launch-profile https
-npm run dev --prefix src/SportsHub.Web
 ```
 
-Open `http://localhost:5173`. Vite proxies `/api` to `https://localhost:7024`; application code always uses relative `/api/...` paths.
+The application opens at `http://localhost:5173`. Vite proxies `/api` to `https://localhost:7024`; application code always uses relative `/api/...` paths. Stop the ASP.NET debugging session to stop the Vite process it launched.
 
 After the first administrator is created, remove the bootstrap password:
 
