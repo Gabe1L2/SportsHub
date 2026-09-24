@@ -47,5 +47,16 @@ jobs:
           foreach ($name in $required) { if ([string]::IsNullOrWhiteSpace((Get-Item "Env:$name").Value)) { throw "Missing required GitHub secret: $name" } }
           $msdeploy = "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
           if (-not (Test-Path $msdeploy)) { throw "WebDeploy is unavailable on this runner." }
-          & $msdeploy -verb:sync -source:contentPath="$pwd\publish" -dest:contentPath="$env:WEBSITE_NAME",computerName="$env:SERVER_COMPUTER_NAME",userName="$env:SERVER_USERNAME",password="$env:SERVER_PASSWORD",authType=Basic -enableRule:AppOffline
+          $sourcePath = (Resolve-Path 'publish').Path
+          $arguments = @(
+            '-verb:sync'
+            "-source:contentPath=$sourcePath"
+            "-dest:contentPath=$env:WEBSITE_NAME,computerName=$env:SERVER_COMPUTER_NAME,userName=$env:SERVER_USERNAME,password=$env:SERVER_PASSWORD,authType=Basic,includeAcls=False"
+            '-enableRule:AppOffline'
+            '-allowUntrusted'
+            '-disableLink:AppPoolExtension'
+            '-disableLink:ContentExtension'
+            '-disableLink:CertificateExtension'
+          )
+          & $msdeploy @arguments
           if ($LASTEXITCODE -ne 0) { throw "WebDeploy failed with exit code $LASTEXITCODE." }
