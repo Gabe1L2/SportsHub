@@ -28,6 +28,7 @@ export function BettingPage() {
   const [formBet, setFormBet] = useState<Bet | null | undefined>(undefined)
   const [settling, setSettling] = useState<Bet | null>(null)
   const [managing, setManaging] = useState(false)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [actionError, setActionError] = useState('')
   const pageSize = viewMode === 'compact' ? 100 : 20
   useEffect(() => { localStorage.setItem('betting-view-mode', viewMode) }, [viewMode])
@@ -64,27 +65,27 @@ export function BettingPage() {
   const filtered = filters.search || filters.status || filters.timing || filters.platformId || filters.sourceId
   return <section>
     <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-      <div><p className="text-sm font-bold uppercase tracking-[.22em] text-emerald-300">Sports betting</p><h1 className="mt-2 text-4xl font-black tracking-tight md:text-5xl">Bet tracker</h1><p className="mt-3 max-w-2xl text-slate-400">Capture the offer, settle the result, and understand the numbers behind every entry.</p></div>
-      <div className="flex flex-wrap gap-2"><div className="flex rounded-xl border border-white/15 bg-white/5 p-1" aria-label="Bet list view"><button className={`rounded-lg px-3 py-2 text-sm font-semibold ${viewMode === 'comfortable' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`} onClick={() => { setViewMode('comfortable'); setFilter('page', 1) }}>Comfortable</button><button className={`rounded-lg px-3 py-2 text-sm font-semibold ${viewMode === 'compact' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`} onClick={() => { setViewMode('compact'); setFilter('page', 1) }}>Compact</button></div><button className={secondaryButton} onClick={() => setManaging(true)}>{canManagePlatforms ? 'Manage platforms & sources' : 'Manage sources'}</button><button className={primaryButton} onClick={addBet}>+ Add bet</button></div>
+      <div><p className="text-xs font-bold uppercase tracking-[.22em] text-emerald-300 sm:text-sm">Sports betting</p><h1 className="mt-2 text-4xl font-black tracking-tight md:text-5xl">Bet tracker</h1><p className="mt-3 max-w-2xl text-sm text-slate-400 sm:text-base">Capture the offer, settle the result, and understand the numbers behind every entry.</p></div>
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"><div className="col-span-2 flex rounded-xl border border-white/15 bg-white/5 p-1 sm:col-span-1" aria-label="Bet list view"><button className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${viewMode === 'comfortable' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`} onClick={() => { setViewMode('comfortable'); setFilter('page', 1) }}>Comfortable</button><button className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${viewMode === 'compact' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`} onClick={() => { setViewMode('compact'); setFilter('page', 1) }}>Compact</button></div><button className={secondaryButton} onClick={() => setManaging(true)}><span className="sm:hidden">Manage</span><span className="hidden sm:inline">{canManagePlatforms ? 'Manage platforms & sources' : 'Manage sources'}</span></button><button className={primaryButton} onClick={addBet}>+ Add bet</button></div>
     </div>
 
-    <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="mt-6 grid grid-cols-2 gap-2 sm:mt-8 sm:gap-3 xl:grid-cols-4">
       <SummaryCard label="Tracked bets" value={summary?.totalBets.toLocaleString() ?? '—'} detail={`${summary?.pendingBets ?? 0} pending`} />
       <SummaryCard label="Cash entered" value={summary ? money(summary.totalEntryCost) : '—'} detail="Active history" />
       <SummaryCard label="Net profit" value={summary ? money(summary.netProfit) : '—'} detail="Settled bets" tone={(summary?.netProfit ?? 0) >= 0 ? 'positive' : 'negative'} />
       <SummaryCard label="ROI" value={summary ? percent(summary.roi) : '—'} detail="On settled cash cost" tone={(summary?.roi ?? 0) >= 0 ? 'positive' : 'negative'} />
     </div>
 
-    <div className="mt-8 rounded-2xl border border-white/10 bg-white/[.035] p-4">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.5fr_repeat(5,1fr)]">
-        <input className={inputClass.replace('mt-1.5 ', '')} placeholder="Search platform, source, or notes" value={filters.search} onChange={e => setFilter('search', e.target.value)} />
+    <div className="mt-6 rounded-2xl border border-white/10 bg-white/[.035] p-3 sm:mt-8 sm:p-4">
+      <div className="flex gap-2 md:contents"><input className={`${inputClass.replace('mt-1.5 ', '')} min-w-0 flex-1`} placeholder="Search bets" value={filters.search} onChange={e => setFilter('search', e.target.value)} /><button type="button" className={`${secondaryButton} shrink-0 md:hidden`} onClick={() => setFiltersOpen(open => !open)}>Filters{filtered ? ' •' : ''} {filtersOpen ? '▲' : '▼'}</button></div>
+      <div className={`${filtersOpen ? 'grid' : 'hidden'} mt-3 grid-cols-2 gap-2 md:mt-0 md:grid md:grid-cols-2 md:gap-3 xl:grid-cols-5`}>
         <select className={inputClass.replace('mt-1.5 ', '')} value={filters.status} onChange={e => setFilter('status', e.target.value as Filters['status'])}><option value="">All results</option>{statuses.map(x => <option key={x} value={x}>{displayEnum(x)}</option>)}</select>
         <select className={inputClass.replace('mt-1.5 ', '')} value={filters.platformId} onChange={e => setFilter('platformId', e.target.value)}><option value="">All platforms</option>{lookups.data?.platforms.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
         <select className={inputClass.replace('mt-1.5 ', '')} value={filters.sourceId} onChange={e => setFilter('sourceId', e.target.value)}><option value="">All sources</option>{lookups.data?.sources.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select>
         <select className={inputClass.replace('mt-1.5 ', '')} value={filters.timing} onChange={e => setFilter('timing', e.target.value as Filters['timing'])}><option value="">Pregame + live</option><option value="Pregame">Pregame</option><option value="Live">Live</option></select>
         <select className={inputClass.replace('mt-1.5 ', '')} value={filters.sort} onChange={e => setFilter('sort', e.target.value)}><option value="placedDesc">Newest first</option><option value="placedAsc">Oldest first</option><option value="entryDesc">Highest entry</option><option value="entryAsc">Lowest entry</option><option value="status">Result</option></select>
       </div>
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3"><label className="flex cursor-pointer items-center gap-2 text-sm text-slate-400"><input type="checkbox" className="accent-emerald-400" checked={filters.archived} onChange={e => setFilter('archived', e.target.checked)} />Show archived bets</label>{filtered && <button className="text-xs font-semibold text-emerald-300 hover:text-emerald-200" onClick={() => setFilters(current => ({ ...initialFilters, archived: current.archived }))}>Clear filters</button>}</div>
+      <div className={`${filtersOpen ? 'flex' : 'hidden'} mt-3 flex-wrap items-center justify-between gap-3 md:flex`}><label className="flex cursor-pointer items-center gap-2 text-sm text-slate-400"><input type="checkbox" className="accent-emerald-400" checked={filters.archived} onChange={e => setFilter('archived', e.target.checked)} />Show archived bets</label>{filtered && <button className="text-xs font-semibold text-emerald-300 hover:text-emerald-200" onClick={() => setFilters(current => ({ ...initialFilters, archived: current.archived }))}>Clear filters</button>}</div>
     </div>
 
     {actionError && <p className="mt-4 rounded-xl bg-rose-400/10 px-4 py-3 text-sm text-rose-200">{actionError}</p>}
@@ -108,7 +109,7 @@ export function BettingPage() {
 }
 
 function SummaryCard({ label, value, detail, tone }: { label: string; value: string; detail: string; tone?: 'positive' | 'negative' }) {
-  return <div className="rounded-2xl border border-white/10 bg-white/[.04] p-5"><p className="text-xs font-bold uppercase tracking-wider text-slate-500">{label}</p><p className={`mt-2 text-2xl font-black ${tone === 'positive' ? 'text-emerald-300' : tone === 'negative' ? 'text-rose-300' : 'text-white'}`}>{value}</p><p className="mt-1 text-xs text-slate-500">{detail}</p></div>
+  return <div className="rounded-xl border border-white/10 bg-white/[.04] p-3 sm:rounded-2xl sm:p-5"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 sm:text-xs">{label}</p><p className={`mt-1 text-xl font-black sm:mt-2 sm:text-2xl ${tone === 'positive' ? 'text-emerald-300' : tone === 'negative' ? 'text-rose-300' : 'text-white'}`}>{value}</p><p className="mt-1 hidden text-xs text-slate-500 sm:block">{detail}</p></div>
 }
 
 function BetRow({ bet, onEdit, onSettle, onArchive, busy }: { bet: Bet; onEdit: () => void; onSettle: () => void; onArchive: () => void; busy: boolean }) {
@@ -125,11 +126,21 @@ function BetRow({ bet, onEdit, onSettle, onArchive, busy }: { bet: Bet; onEdit: 
 function CompactBetTable({ bets, onEdit, onSettle, onArchive, busy }: { bets: Bet[]; onEdit: (bet: Bet) => void; onSettle: (bet: Bet) => void; onArchive: (bet: Bet) => void; busy: boolean }) {
   const columns = 'grid-cols-[155px_170px_48px_90px_85px_95px_105px_90px_75px_minmax(180px,1fr)_120px_145px]'
   return <div className="relative left-1/2 w-[calc(100vw-2rem)] max-w-[1800px] -translate-x-1/2">
-    <div className="max-h-[68vh] overflow-auto rounded-xl border border-white/10 bg-[#0b1626] shadow-xl shadow-black/10">
+    <div className="divide-y divide-white/[.07] overflow-hidden rounded-xl border border-white/10 bg-[#0b1626] shadow-xl shadow-black/10 md:hidden">{bets.map((bet, index) => <MobileCompactBetRow key={bet.id} bet={bet} alternate={index % 2 === 1} onEdit={() => onEdit(bet)} onSettle={() => onSettle(bet)} onArchive={() => onArchive(bet)} busy={busy} />)}</div>
+    <div className="hidden max-h-[68vh] overflow-auto rounded-xl border border-white/10 bg-[#0b1626] shadow-xl shadow-black/10 md:block">
       <div className={`sticky top-0 z-10 grid min-w-[1380px] ${columns} items-center gap-2 border-b border-white/15 bg-[#111d2e] px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-400`}><span>Date & time</span><span>Platform</span><span>Legs</span><span>Structure</span><span>Entry</span><span>Payout</span><span>Result</span><span>P&amp;L</span><span>Timing</span><span>Notes</span><span>Source</span><span className="text-right">Actions</span></div>
       <div className="min-w-[1380px] divide-y divide-white/[.06]">{bets.map((bet, index) => <CompactBetRow key={bet.id} bet={bet} columns={columns} alternate={index % 2 === 1} onEdit={() => onEdit(bet)} onSettle={() => onSettle(bet)} onArchive={() => onArchive(bet)} busy={busy} />)}</div>
     </div>
   </div>
+}
+
+function MobileCompactBetRow({ bet, alternate, onEdit, onSettle, onArchive, busy }: { bet: Bet; alternate: boolean; onEdit: () => void; onSettle: () => void; onArchive: () => void; busy: boolean }) {
+  const placed = new Date(bet.placedAtUtc).toLocaleString(undefined, { month: 'numeric', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+  return <article className={`px-3 py-2.5 ${alternate ? 'bg-white/[.018]' : ''}`}>
+    <div className="flex min-w-0 items-center justify-between gap-3"><span className="flex min-w-0 items-center gap-1.5"><strong className="truncate text-sm text-slate-100">{bet.platform.name}</strong>{bet.bonus && <span className="shrink-0 rounded bg-violet-400/10 px-1.5 py-0.5 text-[9px] font-bold text-violet-300">B</span>}</span><strong className="shrink-0 text-sm tabular-nums">{money(bet.entryCost, bet.currencyCode)}</strong></div>
+    <div className="mt-1 flex items-center justify-between gap-3 text-[11px] text-slate-500"><span className="truncate">{placed} · {bet.legCount}L · {bet.payoutMode === 'Flex' ? 'Flex' : 'Straight'}{bet.timing === 'Live' ? ' · Live' : ''}</span><span className="shrink-0 tabular-nums text-slate-400">→ {money(bet.expectedPayout, bet.currencyCode)}</span></div>
+    <div className="mt-2 flex items-center justify-between gap-2"><span className="flex items-center gap-2"><span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold ${statusStyle[bet.status]}`}>{displayEnum(bet.status)}</span>{bet.profitLoss != null && <span className={`text-[11px] font-semibold ${bet.profitLoss >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{bet.profitLoss > 0 ? '+' : ''}{money(bet.profitLoss, bet.currencyCode)}</span>}</span><span className="flex shrink-0 gap-2 text-[11px]">{!bet.isArchived && <><button className="font-semibold text-slate-300" onClick={onEdit}>Edit</button><button className="font-semibold text-emerald-300" onClick={onSettle}>{bet.status === 'Pending' ? 'Settle' : 'Result'}</button></>}<button disabled={busy} className="font-semibold text-slate-500" onClick={onArchive}>{bet.isArchived ? 'Restore' : 'Archive'}</button></span></div>
+  </article>
 }
 
 function CompactBetRow({ bet, columns, alternate, onEdit, onSettle, onArchive, busy }: { bet: Bet; columns: string; alternate: boolean; onEdit: () => void; onSettle: () => void; onArchive: () => void; busy: boolean }) {
