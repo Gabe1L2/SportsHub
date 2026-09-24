@@ -7,7 +7,7 @@ SportsHub is a pragmatic modular monolith: one React SPA, one ASP.NET Core appli
 - **Identity** uses ASP.NET Core Identity in `dbo`. Registration is not public; an Admin creates users.
 - **Sports** stores canonical sports, leagues, teams, players, providers, and external player IDs in the `sports` schema.
 - **Fantasy** stores projection sources, projections, drafts, and draft picks in the `fantasy` schema.
-- **Betting** stores platforms, user-defined bet sources, bets, payout tiers, optional bonuses, optional bet legs, bankroll accounts, and transactions in the `betting` schema. A bet records its cash entry cost separately from its nominal entry value so free entries remain analyzable, and payout means total returned rather than profit.
+- **Betting** stores platforms, user-defined bet sources, bets, payout tiers, optional bonuses, optional bet legs, bankroll accounts, and transactions in the `betting` schema. Platforms form a shared catalog maintained by administrators, while sources and bets are scoped to their owning user. A bet records its cash entry cost separately from its nominal entry value so free entries remain analyzable, and payout means total returned rather than profit. Bets use reversible soft archiving so historical reporting never depends on deleted records.
 
 A player exists once in Sports. Fantasy projections/draft picks and betting player props reference that canonical record. `Provider` and `PlayerExternalId` leave a deliberate path for imports and identity matching without prematurely building a resolution engine.
 

@@ -60,6 +60,8 @@ public sealed class Bet : AuditableEntity
     public string? Notes { get; set; }
     public DateTime PlacedAtUtc { get; set; } = DateTime.UtcNow;
     public DateTime? SettledAtUtc { get; set; }
+    public bool IsArchived { get; set; }
+    public DateTime? ArchivedAtUtc { get; set; }
     public BetBonus? Bonus { get; set; }
     public ICollection<BetPayoutTier> PayoutTiers { get; set; } = [];
     public ICollection<BetLeg> Legs { get; set; } = [];
@@ -80,6 +82,14 @@ public sealed class Bet : AuditableEntity
         CorrectLegCount = correctLegCount;
         SettledAtUtc = settledAtUtc;
         UpdatedAtUtc = settledAtUtc;
+    }
+
+    public void SetArchived(bool archived, DateTime changedAtUtc)
+    {
+        if (changedAtUtc.Kind != DateTimeKind.Utc) throw new ArgumentException("Archive time must be UTC.", nameof(changedAtUtc));
+        IsArchived = archived;
+        ArchivedAtUtc = archived ? changedAtUtc : null;
+        UpdatedAtUtc = changedAtUtc;
     }
 }
 

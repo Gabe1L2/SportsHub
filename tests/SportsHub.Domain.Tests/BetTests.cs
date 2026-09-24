@@ -39,4 +39,21 @@ public sealed class BetTests
     {
         Assert.Equal(2.5m, BetPricing.DecimalOddsFromPayout(entryValue: 20m, totalPayout: 50m));
     }
+
+    [Fact]
+    public void SetArchived_CanArchiveAndRestoreWithoutDeletingHistory()
+    {
+        var bet = new Bet { UserId = "user-1", EntryCost = 10m, EntryValue = 10m };
+        var changedAt = new DateTime(2026, 9, 24, 20, 0, 0, DateTimeKind.Utc);
+
+        bet.SetArchived(true, changedAt);
+
+        Assert.True(bet.IsArchived);
+        Assert.Equal(changedAt, bet.ArchivedAtUtc);
+
+        bet.SetArchived(false, changedAt.AddMinutes(1));
+
+        Assert.False(bet.IsArchived);
+        Assert.Null(bet.ArchivedAtUtc);
+    }
 }

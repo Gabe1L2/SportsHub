@@ -78,10 +78,12 @@ public sealed class SportsHubDbContext(DbContextOptions<SportsHubDbContext> opti
             e.ToTable("Bets", "betting");
             e.HasIndex(x => new { x.UserId, x.PlacedAtUtc });
             e.HasIndex(x => new { x.UserId, x.Status });
+            e.HasIndex(x => new { x.UserId, x.IsArchived, x.PlacedAtUtc });
             e.Property(x => x.UserId).HasMaxLength(450);
             e.Property(x => x.EntryCost).HasPrecision(18, 2);
             e.Property(x => x.EntryValue).HasPrecision(18, 2);
             e.Property(x => x.LegCount).HasDefaultValue(1);
+            e.Property(x => x.IsArchived).HasDefaultValue(false);
             e.Property(x => x.DecimalOdds).HasPrecision(18, 6);
             e.Property(x => x.EstimatedProbability).HasPrecision(7, 6);
             e.Property(x => x.ActualPayout).HasPrecision(18, 2);

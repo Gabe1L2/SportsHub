@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Identity;
+using System.Text.Json.Serialization;
 using SportsHub.Api.Features.Account;
 using SportsHub.Api.Features.Admin;
 using SportsHub.Api.Features.Betting;
@@ -14,6 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
+builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddSportsHubInfrastructure(builder.Configuration);
 builder.Services
     .AddIdentityCore<ApplicationUser>(options =>
