@@ -1,0 +1,49 @@
+# Local toolchains and caches
+.dotnet/
+.dotnet-cli-home/
+.nuget-packages/
+.npm-cache/
+.dotnet-install.ps1
+
+# .NET
+**/bin/
+**/obj/
+artifacts/
+publish/
+TestResults/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Frontend
+**/node_modules/
+src/SportsHub.Web/dist/
+*.tsbuildinfo
+.vite/
+
+# Secrets and deployment credentials
+.env
+.env.*
+!.env.example
+*.publishSettings
+*.pubxml.user
+secrets.json
+
+# Editors / OS / logs / temporary files
+.vs/
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.log
+logs/
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Database exports and backups
+*.bak
+*.bacpac
+*.bcp

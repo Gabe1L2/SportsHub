@@ -1,0 +1,51 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+          cache: npm
+          cache-dependency-path: src/SportsHub.Web/package-lock.json
+      - name: Install and build frontend
+        working-directory: src/SportsHub.Web
+        run: |
+          npm ci
+          npm run build
+      - name: Restore and publish one ASP.NET site
+        shell: pwsh
+        run: |
+          dotnet restore SportsHub.sln
+          dotnet publish src/SportsHub.Api/SportsHub.Api.csproj --configuration Release --no-restore --output publish -p:SkipFrontendBuild=true
+          Copy-Item -Recurse -Force src/SportsHub.Web/dist/* publish/wwwroot/
+      - name: Deploy with WebDeploy
+        shell: pwsh
+        env:
+          WEBSITE_NAME: ${{ secrets.WEBSITE_NAME }}
+          SERVER_COMPUTER_NAME: ${{ secrets.SERVER_COMPUTER_NAME }}
+          SERVER_USERNAME: ${{ secrets.SERVER_USERNAME }}
+          SERVER_PASSWORD: ${{ secrets.SERVER_PASSWORD }}
+        run: |
+          $required = 'WEBSITE_NAME','SERVER_COMPUTER_NAME','SERVER_USERNAME','SERVER_PASSWORD'
+          foreach ($name in $required) { if ([string]::IsNullOrWhiteSpace((Get-Item "Env:$name").Value)) { throw "Missing required GitHub secret: $name" } }
+          $msdeploy = "${env:ProgramFiles}\IIS\Microsoft Web Deploy V3\msdeploy.exe"
+          if (-not (Test-Path $msdeploy)) { throw "WebDeploy is unavailable on this runner." }
+          & $msdeploy -verb:sync -source:contentPath="$pwd\publish" -dest:contentPath="$env:WEBSITE_NAME",computerName="$env:SERVER_COMPUTER_NAME",userName="$env:SERVER_USERNAME",password="$env:SERVER_PASSWORD",authType=Basic -enableRule:AppOffline
+          if ($LASTEXITCODE -ne 0) { throw "WebDeploy failed with exit code $LASTEXITCODE." }

@@ -1,0 +1,11 @@
+@SportsHub.Api_HostAddress = https://localhost:7024
+
+GET {{SportsHub.Api_HostAddress}}/api/health
+Accept: application/json
+
+###
+
+GET {{SportsHub.Api_HostAddress}}/api/account/antiforgery
+Accept: application/json
+
+###

@@ -1,0 +1,2 @@
+import { useAuth } from '../auth/AuthProvider'
+export function AccountPage() { const { user } = useAuth(); return <section><h1 className="text-4xl font-black">Account</h1><div className="mt-6 rounded-2xl border border-white/10 bg-white/5 p-6"><div className="text-sm text-slate-400">Signed in as</div><div className="mt-1 text-lg font-semibold">{user?.email}</div><div className="mt-4 flex gap-2">{user?.roles.map(role => <span key={role} className="rounded-full bg-white/10 px-3 py-1 text-xs">{role}</span>)}</div></div></section> }
