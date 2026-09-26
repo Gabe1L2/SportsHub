@@ -36,6 +36,15 @@ public sealed class Player : AuditableEntity
     public string? Position { get; set; }
     public bool IsActive { get; set; } = true;
     public ICollection<PlayerExternalId> ExternalIds { get; set; } = [];
+    public ICollection<PlayerAlias> Aliases { get; set; } = [];
+}
+
+public sealed class PlayerAlias : Entity
+{
+    public Guid PlayerId { get; set; }
+    public Player Player { get; set; } = null!;
+    public required string Name { get; set; }
+    public required string NormalizedName { get; set; }
 }
 
 public sealed class Provider : Entity

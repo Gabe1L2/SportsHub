@@ -36,4 +36,17 @@ public sealed class BettingFinanceTests
         Assert.Equal(3_700m, BettingFinanceMath.OverallProfitAfterTools(4_000m, 300m));
         Assert.Equal(500m, BettingFinanceMath.CurrentBankroll(4_000m, 1_000m, 4_500m, 0m));
     }
+
+    [Fact]
+    public void SharedBankrollIncludesBettingAndFantasyWithoutCombiningTheirProfitMetrics()
+    {
+        var balance = BettingFinanceMath.CurrentSportsBankroll(
+            betProfit: 250m,
+            fantasyProfit: -40m,
+            deposits: 500m,
+            withdrawals: 100m,
+            adjustments: 5m);
+
+        Assert.Equal(615m, balance);
+    }
 }

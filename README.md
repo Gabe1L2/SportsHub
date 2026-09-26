@@ -2,6 +2,8 @@
 
 SportsHub is a .NET 10 modular monolith containing a React SPA, an ASP.NET Core API, ASP.NET Core Identity, and one SQL Server database hosted by MonsterASP.NET. Fantasy Draft Helper and Sports Betting Tracker are modules of the same application—not separate sites or services.
 
+The Fantasy module includes the On the Clock live NBA best-ball assistant, server-synchronized draft rooms and source snapshots, completed-draft result tracking, separate fantasy P&L, combined sports P&L, and canonical player aliases for imported names. Betting and fantasy activity keep separate performance metrics while sharing platform wallet balances.
+
 > **Database warning:** local development intentionally connects to the same real MonsterASP.NET production database used by the deployed site. There is no local, development, test, staging, or preview database. Read [Database Safety](docs/DATABASE_SAFETY.md) before changing data or applying migrations.
 
 ## Repository

@@ -53,6 +53,8 @@ export type BankrollTransaction = {
 export type BettingToolExpense = { id: string; toolName: string; amount: number; incurredAtUtc: string; note: string | null }
 export type BettingFinanceSummary = {
   betProfit: number
+  fantasyProfit: number
+  sportsProfit: number
   totalDeposits: number
   totalWithdrawals: number
   netCashFlow: number

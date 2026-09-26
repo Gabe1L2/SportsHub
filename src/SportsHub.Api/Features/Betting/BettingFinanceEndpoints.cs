@@ -25,6 +25,8 @@ public sealed record BankrollTransactionResponse(
 public sealed record ToolExpenseResponse(Guid Id, string ToolName, decimal Amount, DateTime IncurredAtUtc, string? Note);
 public sealed record BettingFinanceSummaryResponse(
     decimal BetProfit,
+    decimal FantasyProfit,
+    decimal SportsProfit,
     decimal TotalDeposits,
     decimal TotalWithdrawals,
     decimal NetCashFlow,
@@ -257,14 +259,24 @@ public static class BettingFinanceEndpoints
         var toolCosts = await db.BettingToolExpenses.AsNoTracking()
             .Where(x => x.UserId == userId)
             .SumAsync(x => (decimal?)x.Amount, cancellationToken) ?? 0m;
+        var fantasyWinnings = await db.Drafts.AsNoTracking()
+            .Where(x => x.UserId == userId && !x.IsArchived && x.Status == SportsHub.Domain.Fantasy.DraftStatus.Completed)
+            .SumAsync(x => x.Winnings, cancellationToken) ?? 0m;
+        var fantasyBuyIns = await db.Drafts.AsNoTracking()
+            .Where(x => x.UserId == userId && !x.IsArchived && x.Status == SportsHub.Domain.Fantasy.DraftStatus.Completed)
+            .SumAsync(x => (decimal?)x.BuyIn, cancellationToken) ?? 0m;
+        var fantasyProfit = fantasyWinnings - fantasyBuyIns;
+        var sportsProfit = betProfit + fantasyProfit;
         var netCashFlow = deposits - withdrawals;
         return new BettingFinanceSummaryResponse(
             betProfit,
+            fantasyProfit,
+            sportsProfit,
             deposits,
             withdrawals,
             netCashFlow,
             adjustments,
-            BettingFinanceMath.CurrentBankroll(betProfit, deposits, withdrawals, adjustments),
+            BettingFinanceMath.CurrentSportsBankroll(betProfit, fantasyProfit, deposits, withdrawals, adjustments),
             toolCosts,
             BettingFinanceMath.OverallProfitAfterTools(betProfit, toolCosts));
     }
