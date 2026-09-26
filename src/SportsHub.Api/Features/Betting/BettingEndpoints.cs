@@ -25,7 +25,6 @@ public sealed record BetBonusRequest(BetBonusType Type, decimal? Percentage, dec
 public sealed record BetUpsertRequest(
     Guid PlatformId,
     Guid? SourceId,
-    Guid? BankrollAccountId,
     decimal EntryCost,
     decimal EntryValue,
     int LegCount,
@@ -50,7 +49,6 @@ public sealed record BetResponse(
     Guid Id,
     PlatformResponse Platform,
     SourceResponse? Source,
-    Guid? BankrollAccountId,
     decimal EntryCost,
     decimal EntryValue,
     int LegCount,
@@ -97,6 +95,7 @@ public static class BettingEndpoints
         group.MapPost("/sources", CreateSourceAsync).ValidateAntiforgery();
         group.MapPut("/sources/{id:guid}", UpdateSourceAsync).ValidateAntiforgery();
         group.MapBetCsvImportEndpoints();
+        group.MapBettingFinanceEndpoints();
         return endpoints;
     }
 
@@ -288,7 +287,6 @@ public static class BettingEndpoints
         if (request.Notes?.Length > 2000) errors["notes"] = ["Notes cannot exceed 2,000 characters."];
         if (!await db.BettingPlatforms.AnyAsync(x => x.Id == request.PlatformId, cancellationToken)) errors["platformId"] = ["Select a valid platform."];
         if (request.SourceId is not null && !await db.BetSources.AnyAsync(x => x.Id == request.SourceId && x.UserId == userId, cancellationToken)) errors["sourceId"] = ["Select a valid source."];
-        if (request.BankrollAccountId is not null && !await db.BankrollAccounts.AnyAsync(x => x.Id == request.BankrollAccountId && x.UserId == userId, cancellationToken)) errors["bankrollAccountId"] = ["Select a valid bankroll account."];
 
         var tiers = (request.PayoutTiers ?? []).Select(x => new BetPayoutTierRequest(x.RequiredCorrectLegs, x.BasePayoutAmount ?? x.FinalPayoutAmount, x.FinalPayoutAmount)).ToList();
         if (tiers.Count == 0 && request.DecimalOdds is > 0 && request.EntryValue > 0)
@@ -317,7 +315,7 @@ public static class BettingEndpoints
 
     private static void ApplyRequest(Bet bet, BetUpsertRequest request, decimal? decimalOdds, DateTime now)
     {
-        bet.PlatformId = request.PlatformId; bet.SourceId = request.SourceId; bet.BankrollAccountId = request.BankrollAccountId;
+        bet.PlatformId = request.PlatformId; bet.SourceId = request.SourceId;
         bet.EntryCost = request.EntryCost; bet.EntryValue = request.EntryValue; bet.LegCount = request.LegCount; bet.PayoutMode = request.PayoutMode;
         bet.DecimalOdds = decimalOdds; bet.EstimatedProbability = request.EstimatedProbability; bet.Timing = request.Timing;
         bet.CurrencyCode = string.IsNullOrWhiteSpace(request.CurrencyCode) ? "USD" : request.CurrencyCode.Trim().ToUpperInvariant();
@@ -364,7 +362,7 @@ public static class BettingEndpoints
     {
         var tiers = bet.PayoutTiers.OrderBy(x => x.RequiredCorrectLegs).Select(x => new BetPayoutTierResponse(x.Id, x.RequiredCorrectLegs, x.BasePayoutAmount, x.FinalPayoutAmount)).ToArray();
         var expectedPayout = tiers.FirstOrDefault(x => x.RequiredCorrectLegs == bet.LegCount)?.FinalPayoutAmount;
-        return new BetResponse(bet.Id, new PlatformResponse(bet.Platform.Id, bet.Platform.Name, bet.Platform.Type, bet.Platform.IsActive), bet.Source is null ? null : new SourceResponse(bet.Source.Id, bet.Source.Name, bet.Source.Type, bet.Source.IsActive), bet.BankrollAccountId, bet.EntryCost, bet.EntryValue, bet.LegCount, bet.PayoutMode, bet.DecimalOdds, bet.EstimatedProbability, bet.Timing, bet.Status, bet.CorrectLegCount, expectedPayout, bet.ActualPayout, bet.ActualProfitLoss, bet.CurrencyCode, bet.Notes, AsUtc(bet.PlacedAtUtc), AsUtc(bet.SettledAtUtc), bet.IsArchived, AsUtc(bet.ArchivedAtUtc), bet.Bonus is null ? null : new BetBonusResponse(bet.Bonus.Id, bet.Bonus.Type, bet.Bonus.Percentage, bet.Bonus.FixedAmount, bet.Bonus.Description), tiers);
+        return new BetResponse(bet.Id, new PlatformResponse(bet.Platform.Id, bet.Platform.Name, bet.Platform.Type, bet.Platform.IsActive), bet.Source is null ? null : new SourceResponse(bet.Source.Id, bet.Source.Name, bet.Source.Type, bet.Source.IsActive), bet.EntryCost, bet.EntryValue, bet.LegCount, bet.PayoutMode, bet.DecimalOdds, bet.EstimatedProbability, bet.Timing, bet.Status, bet.CorrectLegCount, expectedPayout, bet.ActualPayout, bet.ActualProfitLoss, bet.CurrencyCode, bet.Notes, AsUtc(bet.PlacedAtUtc), AsUtc(bet.SettledAtUtc), bet.IsArchived, AsUtc(bet.ArchivedAtUtc), bet.Bonus is null ? null : new BetBonusResponse(bet.Bonus.Id, bet.Bonus.Type, bet.Bonus.Percentage, bet.Bonus.FixedAmount, bet.Bonus.Description), tiers);
     }
 
     private static IResult NameValidation(string field, int maximum) => Results.ValidationProblem(new Dictionary<string, string[]> { ["name"] = [$"The {field} name is required and cannot exceed {maximum} characters."] });

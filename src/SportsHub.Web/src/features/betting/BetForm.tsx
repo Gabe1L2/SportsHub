@@ -86,7 +86,7 @@ export function BetForm({ bet, lookups, saving, onClose, onSave }: Props) {
 
     try {
       await onSave({
-        platformId, sourceId: sourceId || null, bankrollAccountId: bet?.bankrollAccountId ?? null,
+        platformId, sourceId: sourceId || null,
         entryCost: cost, entryValue: value, legCount: legs, payoutMode, decimalOdds,
         estimatedProbability: probability === '' ? null : Number(probability) / 100,
         timing, placedAtUtc: new Date(placedAt).toISOString(), currencyCode: currencyCode.toUpperCase(), notes: notes.trim() || null,

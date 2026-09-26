@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations.Schema;
 using SportsHub.Domain.Common;
-using SportsHub.Domain.Sports;
 
 namespace SportsHub.Domain.Betting;
 
@@ -14,13 +13,12 @@ public enum BetStatus
     PartiallyWon = 5
 }
 
-public enum BetType { Spread, Moneyline, Total, PlayerProp, Other }
 public enum BetPayoutMode { AllOrNothing, Flex }
 public enum BetTiming { Pregame, Live }
 public enum BettingPlatformType { PickEm, Sportsbook, Exchange, Other }
 public enum BetSourceType { Self, Tool, Capper, Friend, Other }
 public enum BetBonusType { PayoutBoost, DiscountPick, FreeEntry, ProtectedEntry, Other }
-public enum BankrollTransactionType { Deposit, Withdrawal, Bonus, BetSettlement, Adjustment }
+public enum BankrollTransactionType { Deposit, Withdrawal, Adjustment }
 
 public sealed class BettingPlatform : Entity
 {
@@ -44,8 +42,6 @@ public sealed class Bet : AuditableEntity
     public BettingPlatform Platform { get; set; } = null!;
     public Guid? SourceId { get; set; }
     public BetSource? Source { get; set; }
-    public Guid? BankrollAccountId { get; set; }
-    public BankrollAccount? BankrollAccount { get; set; }
     public decimal EntryCost { get; set; }
     public decimal EntryValue { get; set; }
     public int LegCount { get; set; } = 1;
@@ -64,7 +60,6 @@ public sealed class Bet : AuditableEntity
     public DateTime? ArchivedAtUtc { get; set; }
     public BetBonus? Bonus { get; set; }
     public ICollection<BetPayoutTier> PayoutTiers { get; set; } = [];
-    public ICollection<BetLeg> Legs { get; set; } = [];
 
     [NotMapped]
     public decimal? ActualProfitLoss => ActualPayout is null ? null : ActualPayout.Value - EntryCost;
@@ -130,33 +125,39 @@ public static class BetPricing
     }
 }
 
-// Optional detail for future per-leg analytics. Current bet entry only requires Bet.LegCount.
-public sealed class BetLeg : Entity
-{
-    public Guid BetId { get; set; }
-    public Bet Bet { get; set; } = null!;
-    public BetType Type { get; set; }
-    public Guid? PlayerId { get; set; }
-    public Player? Player { get; set; }
-    public required string Description { get; set; }
-    public decimal? Line { get; set; }
-    public int? AmericanOdds { get; set; }
-}
-
-public sealed class BankrollAccount : AuditableEntity
+public sealed class BankrollTransaction : AuditableEntity
 {
     public required string UserId { get; set; }
-    public required string Name { get; set; }
-    public decimal CurrentBalance { get; set; }
-    public ICollection<BankrollTransaction> Transactions { get; set; } = [];
-}
-
-public sealed class BankrollTransaction : Entity
-{
-    public Guid BankrollAccountId { get; set; }
-    public BankrollAccount BankrollAccount { get; set; } = null!;
+    public Guid? PlatformId { get; set; }
+    public BettingPlatform? Platform { get; set; }
     public BankrollTransactionType Type { get; set; }
+    // Signed ledger value: deposits are positive, withdrawals negative, and adjustments may be either.
     public decimal Amount { get; set; }
+    public decimal? TargetBalance { get; set; }
     public DateTime OccurredAtUtc { get; set; }
     public string? Note { get; set; }
+}
+
+public sealed class BettingToolExpense : AuditableEntity
+{
+    public required string UserId { get; set; }
+    public required string ToolName { get; set; }
+    public decimal Amount { get; set; }
+    public DateTime IncurredAtUtc { get; set; }
+    public string? Note { get; set; }
+}
+
+public static class BettingFinanceMath
+{
+    public static decimal LedgerAmount(BankrollTransactionType type, decimal amount) => type switch
+    {
+        BankrollTransactionType.Deposit => decimal.Abs(amount),
+        BankrollTransactionType.Withdrawal => -decimal.Abs(amount),
+        _ => amount
+    };
+
+    public static decimal CurrentBankroll(decimal betProfit, decimal deposits, decimal withdrawals, decimal adjustments) =>
+        betProfit + deposits - withdrawals + adjustments;
+
+    public static decimal OverallProfitAfterTools(decimal betProfit, decimal toolCosts) => betProfit - toolCosts;
 }

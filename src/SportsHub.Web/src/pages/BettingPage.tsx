@@ -4,9 +4,10 @@ import { api } from '../lib/api'
 import { useAuth } from '../auth/AuthProvider'
 import { BetForm } from '../features/betting/BetForm'
 import { BetCsvImporter } from '../features/betting/BetCsvImporter'
+import { BettingFinanceManager } from '../features/betting/BettingFinanceManager'
 import { LookupManager } from '../features/betting/LookupManager'
 import { SettleDialog } from '../features/betting/SettleDialog'
-import type { Bet, BetInput, BettingLookups, BetListResponse, BetStatus, BetTiming } from '../features/betting/types'
+import type { Bet, BetInput, BettingFinanceSummary, BettingLookups, BetListResponse, BetStatus, BetTiming } from '../features/betting/types'
 import { displayEnum, money, percent } from '../features/betting/types'
 import { EmptyState, inputClass, primaryButton, secondaryButton } from '../features/betting/ui'
 
@@ -30,6 +31,7 @@ export function BettingPage() {
   const [settling, setSettling] = useState<Bet | null>(null)
   const [managing, setManaging] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [managingFinance, setManagingFinance] = useState(false)
   const [filtersOpen, setFiltersOpen] = useState(false)
   const [actionError, setActionError] = useState('')
   const pageSize = viewMode === 'compact' ? 100 : 20
@@ -44,6 +46,7 @@ export function BettingPage() {
     return query.toString()
   }, [filters, pageSize])
   const bets = useQuery({ queryKey: ['betting', 'bets', queryString], queryFn: () => api<BetListResponse>(`/api/betting/bets?${queryString}`) })
+  const financeSummary = useQuery({ queryKey: ['betting', 'finance', 'summary'], queryFn: () => api<BettingFinanceSummary>('/api/betting/finance/summary') })
   const lookups = useQuery({ queryKey: ['betting', 'lookups'], queryFn: () => api<BettingLookups>('/api/betting/lookups') })
   const refresh = () => client.invalidateQueries({ queryKey: ['betting'] })
   const saveBet = useMutation({ mutationFn: ({ bet, input }: { bet?: Bet | null; input: BetInput }) => api<Bet>(bet ? `/api/betting/bets/${bet.id}` : '/api/betting/bets', { method: bet ? 'PUT' : 'POST', body: JSON.stringify(input) }), onSuccess: () => { setFormBet(undefined); void refresh() } })
@@ -68,14 +71,16 @@ export function BettingPage() {
   return <section>
     <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
       <div><p className="text-xs font-bold uppercase tracking-[.22em] text-emerald-300 sm:text-sm">Sports betting</p><h1 className="mt-2 text-4xl font-black tracking-tight md:text-5xl">Bet tracker</h1><p className="mt-3 max-w-2xl text-sm text-slate-400 sm:text-base">Capture the offer, settle the result, and understand the numbers behind every entry.</p></div>
-      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"><div className="col-span-2 flex rounded-xl border border-white/15 bg-white/5 p-1 sm:col-span-1" aria-label="Bet list view"><button className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${viewMode === 'comfortable' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`} onClick={() => { setViewMode('comfortable'); setFilter('page', 1) }}>Comfortable</button><button className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${viewMode === 'compact' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`} onClick={() => { setViewMode('compact'); setFilter('page', 1) }}>Compact</button></div>{canManagePlatforms && <button className={secondaryButton} onClick={() => setImporting(true)}>Import CSV</button>}<button className={secondaryButton} onClick={() => setManaging(true)}><span className="sm:hidden">Manage</span><span className="hidden sm:inline">{canManagePlatforms ? 'Manage platforms & sources' : 'Manage sources'}</span></button><button className={primaryButton} onClick={addBet}>+ Add bet</button></div>
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap"><div className="col-span-2 flex rounded-xl border border-white/15 bg-white/5 p-1 sm:col-span-1" aria-label="Bet list view"><button className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${viewMode === 'comfortable' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`} onClick={() => { setViewMode('comfortable'); setFilter('page', 1) }}>Comfortable</button><button className={`flex-1 rounded-lg px-3 py-2 text-sm font-semibold ${viewMode === 'compact' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`} onClick={() => { setViewMode('compact'); setFilter('page', 1) }}>Compact</button></div><button className={secondaryButton} onClick={() => setManagingFinance(true)}>Bankroll & costs</button>{canManagePlatforms && <button className={secondaryButton} onClick={() => setImporting(true)}>Import CSV</button>}<button className={secondaryButton} onClick={() => setManaging(true)}><span className="sm:hidden">Manage</span><span className="hidden sm:inline">{canManagePlatforms ? 'Manage platforms & sources' : 'Manage sources'}</span></button><button className={primaryButton} onClick={addBet}>+ Add bet</button></div>
     </div>
 
-    <div className="mt-6 grid grid-cols-2 gap-2 sm:mt-8 sm:gap-3 xl:grid-cols-4">
+    <div className="mt-6 grid grid-cols-2 gap-2 sm:mt-8 sm:gap-3 xl:grid-cols-3 2xl:grid-cols-6">
       <SummaryCard label="Tracked bets" value={summary?.totalBets.toLocaleString() ?? '—'} detail={`${summary?.pendingBets ?? 0} pending`} />
       <SummaryCard label="Cash entered" value={summary ? money(summary.totalEntryCost) : '—'} detail="Active history" />
       <SummaryCard label="Net profit" value={summary ? money(summary.netProfit) : '—'} detail="Settled bets" tone={(summary?.netProfit ?? 0) >= 0 ? 'positive' : 'negative'} />
       <SummaryCard label="ROI" value={summary ? percent(summary.roi) : '—'} detail="On settled cash cost" tone={(summary?.roi ?? 0) >= 0 ? 'positive' : 'negative'} />
+      <SummaryCard label="Current bankroll" value={financeSummary.data ? money(financeSummary.data.currentBankroll) : '—'} detail="Across all platforms" tone={(financeSummary.data?.currentBankroll ?? 0) >= 0 ? 'positive' : 'negative'} />
+      <SummaryCard label="Profit after tools" value={financeSummary.data ? money(financeSummary.data.overallProfitAfterTools) : '—'} detail="Bet profit less tool costs" tone={(financeSummary.data?.overallProfitAfterTools ?? 0) >= 0 ? 'positive' : 'negative'} />
     </div>
 
     <div className="mt-6 rounded-2xl border border-white/10 bg-white/[.035] p-3 sm:mt-8 sm:p-4">
@@ -108,6 +113,7 @@ export function BettingPage() {
     {settling && <SettleDialog bet={settling} saving={settleBet.isPending} onClose={() => setSettling(null)} onSave={input => settleBet.mutateAsync({ bet: settling, input }).then(() => undefined)} />}
     {managing && lookups.data && <LookupManager lookups={lookups.data} canManagePlatforms={canManagePlatforms} onClose={() => setManaging(false)} />}
     {importing && canManagePlatforms && <BetCsvImporter onClose={() => setImporting(false)} />}
+    {managingFinance && lookups.data && <BettingFinanceManager lookups={lookups.data} onClose={() => setManagingFinance(false)} />}
   </section>
 }
 

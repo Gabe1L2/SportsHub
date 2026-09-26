@@ -25,9 +25,8 @@ public sealed class SportsHubDbContext(DbContextOptions<SportsHubDbContext> opti
     public DbSet<Bet> Bets => Set<Bet>();
     public DbSet<BetPayoutTier> BetPayoutTiers => Set<BetPayoutTier>();
     public DbSet<BetBonus> BetBonuses => Set<BetBonus>();
-    public DbSet<BetLeg> BetLegs => Set<BetLeg>();
-    public DbSet<BankrollAccount> BankrollAccounts => Set<BankrollAccount>();
     public DbSet<BankrollTransaction> BankrollTransactions => Set<BankrollTransaction>();
+    public DbSet<BettingToolExpense> BettingToolExpenses => Set<BettingToolExpense>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -92,7 +91,6 @@ public sealed class SportsHubDbContext(DbContextOptions<SportsHubDbContext> opti
             e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Platform).WithMany().HasForeignKey(x => x.PlatformId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.Source).WithMany().HasForeignKey(x => x.SourceId).OnDelete(DeleteBehavior.Restrict);
-            e.HasOne(x => x.BankrollAccount).WithMany().HasForeignKey(x => x.BankrollAccountId).OnDelete(DeleteBehavior.SetNull);
         });
         builder.Entity<BetPayoutTier>(e =>
         {
@@ -111,8 +109,26 @@ public sealed class SportsHubDbContext(DbContextOptions<SportsHubDbContext> opti
             e.Property(x => x.Description).HasMaxLength(1000);
             e.HasOne(x => x.Bet).WithOne(x => x.Bonus).HasForeignKey<BetBonus>(x => x.BetId).OnDelete(DeleteBehavior.Restrict);
         });
-        builder.Entity<BetLeg>(e => { e.ToTable("BetLegs", "betting"); e.Property(x => x.Description).HasMaxLength(500); e.Property(x => x.Line).HasPrecision(12, 3); e.HasOne(x => x.Bet).WithMany(x => x.Legs).HasForeignKey(x => x.BetId).OnDelete(DeleteBehavior.Restrict); e.HasOne(x => x.Player).WithMany().HasForeignKey(x => x.PlayerId).OnDelete(DeleteBehavior.Restrict); });
-        builder.Entity<BankrollAccount>(e => { e.ToTable("BankrollAccounts", "betting"); e.HasIndex(x => new { x.UserId, x.Name }).IsUnique(); e.Property(x => x.UserId).HasMaxLength(450); e.Property(x => x.Name).HasMaxLength(120); e.Property(x => x.CurrentBalance).HasPrecision(18, 2); e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict); });
-        builder.Entity<BankrollTransaction>(e => { e.ToTable("BankrollTransactions", "betting"); e.Property(x => x.Amount).HasPrecision(18, 2); e.Property(x => x.Note).HasMaxLength(500); e.HasOne(x => x.BankrollAccount).WithMany(x => x.Transactions).HasForeignKey(x => x.BankrollAccountId).OnDelete(DeleteBehavior.Restrict); });
+        builder.Entity<BankrollTransaction>(e =>
+        {
+            e.ToTable("BankrollTransactions", "betting");
+            e.HasIndex(x => new { x.UserId, x.OccurredAtUtc });
+            e.Property(x => x.UserId).HasMaxLength(450);
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.TargetBalance).HasPrecision(18, 2);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Platform).WithMany().HasForeignKey(x => x.PlatformId).OnDelete(DeleteBehavior.Restrict);
+        });
+        builder.Entity<BettingToolExpense>(e =>
+        {
+            e.ToTable("ToolExpenses", "betting");
+            e.HasIndex(x => new { x.UserId, x.IncurredAtUtc });
+            e.Property(x => x.UserId).HasMaxLength(450);
+            e.Property(x => x.ToolName).HasMaxLength(160);
+            e.Property(x => x.Amount).HasPrecision(18, 2);
+            e.Property(x => x.Note).HasMaxLength(500);
+            e.HasOne<ApplicationUser>().WithMany().HasForeignKey(x => x.UserId).OnDelete(DeleteBehavior.Restrict);
+        });
     }
 }

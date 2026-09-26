@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using SportsHub.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using SportsHub.Infrastructure.Persistence;
 namespace SportsHub.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(SportsHubDbContext))]
-    partial class SportsHubDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260926192305_RemoveBetLegs")]
+    partial class RemoveBetLegs
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -155,35 +158,23 @@ namespace SportsHub.Infrastructure.Persistence.Migrations
                     b.ToTable("AspNetUserTokens", (string)null);
                 });
 
-            modelBuilder.Entity("SportsHub.Domain.Betting.BankrollTransaction", b =>
+            modelBuilder.Entity("SportsHub.Domain.Betting.BankrollAccount", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
                     b.Property<DateTime>("CreatedAtUtc")
                         .HasColumnType("datetime2");
 
-                    b.Property<string>("Note")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<DateTime>("OccurredAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<Guid?>("PlatformId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<decimal?>("TargetBalance")
+                    b.Property<decimal>("CurrentBalance")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
 
-                    b.Property<int>("Type")
-                        .HasColumnType("int");
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
 
                     b.Property<DateTime>("UpdatedAtUtc")
                         .HasColumnType("datetime2");
@@ -195,9 +186,38 @@ namespace SportsHub.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("PlatformId");
+                    b.HasIndex("UserId", "Name")
+                        .IsUnique();
 
-                    b.HasIndex("UserId", "OccurredAtUtc");
+                    b.ToTable("BankrollAccounts", "betting");
+                });
+
+            modelBuilder.Entity("SportsHub.Domain.Betting.BankrollTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<Guid>("BankrollAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Note")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<DateTime>("OccurredAtUtc")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BankrollAccountId");
 
                     b.ToTable("BankrollTransactions", "betting");
                 });
@@ -214,6 +234,9 @@ namespace SportsHub.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTime?>("ArchivedAtUtc")
                         .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("BankrollAccountId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<int?>("CorrectLegCount")
                         .HasColumnType("int");
@@ -289,6 +312,8 @@ namespace SportsHub.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(450)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BankrollAccountId");
 
                     b.HasIndex("PlatformId");
 
@@ -426,46 +451,6 @@ namespace SportsHub.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Platforms", "betting");
-                });
-
-            modelBuilder.Entity("SportsHub.Domain.Betting.BettingToolExpense", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<decimal>("Amount")
-                        .HasPrecision(18, 2)
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<DateTime>("CreatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<DateTime>("IncurredAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("Note")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("ToolName")
-                        .IsRequired()
-                        .HasMaxLength(160)
-                        .HasColumnType("nvarchar(160)");
-
-                    b.Property<DateTime>("UpdatedAtUtc")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("UserId")
-                        .IsRequired()
-                        .HasMaxLength(450)
-                        .HasColumnType("nvarchar(450)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId", "IncurredAtUtc");
-
-                    b.ToTable("ToolExpenses", "betting");
                 });
 
             modelBuilder.Entity("SportsHub.Domain.Fantasy.Draft", b =>
@@ -894,24 +879,33 @@ namespace SportsHub.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("SportsHub.Domain.Betting.BankrollTransaction", b =>
+            modelBuilder.Entity("SportsHub.Domain.Betting.BankrollAccount", b =>
                 {
-                    b.HasOne("SportsHub.Domain.Betting.BettingPlatform", "Platform")
-                        .WithMany()
-                        .HasForeignKey("PlatformId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
                     b.HasOne("SportsHub.Infrastructure.Identity.ApplicationUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+                });
 
-                    b.Navigation("Platform");
+            modelBuilder.Entity("SportsHub.Domain.Betting.BankrollTransaction", b =>
+                {
+                    b.HasOne("SportsHub.Domain.Betting.BankrollAccount", "BankrollAccount")
+                        .WithMany("Transactions")
+                        .HasForeignKey("BankrollAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("BankrollAccount");
                 });
 
             modelBuilder.Entity("SportsHub.Domain.Betting.Bet", b =>
                 {
+                    b.HasOne("SportsHub.Domain.Betting.BankrollAccount", "BankrollAccount")
+                        .WithMany()
+                        .HasForeignKey("BankrollAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("SportsHub.Domain.Betting.BettingPlatform", "Platform")
                         .WithMany()
                         .HasForeignKey("PlatformId")
@@ -928,6 +922,8 @@ namespace SportsHub.Infrastructure.Persistence.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("BankrollAccount");
 
                     b.Navigation("Platform");
 
@@ -957,15 +953,6 @@ namespace SportsHub.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("SportsHub.Domain.Betting.BetSource", b =>
-                {
-                    b.HasOne("SportsHub.Infrastructure.Identity.ApplicationUser", null)
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("SportsHub.Domain.Betting.BettingToolExpense", b =>
                 {
                     b.HasOne("SportsHub.Infrastructure.Identity.ApplicationUser", null)
                         .WithMany()
@@ -1078,6 +1065,11 @@ namespace SportsHub.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("League");
+                });
+
+            modelBuilder.Entity("SportsHub.Domain.Betting.BankrollAccount", b =>
+                {
+                    b.Navigation("Transactions");
                 });
 
             modelBuilder.Entity("SportsHub.Domain.Betting.Bet", b =>

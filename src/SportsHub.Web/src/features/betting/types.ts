@@ -4,6 +4,7 @@ export type BetPayoutMode = 'AllOrNothing' | 'Flex'
 export type PlatformType = 'PickEm' | 'Sportsbook' | 'Exchange' | 'Other'
 export type SourceType = 'Self' | 'Tool' | 'Capper' | 'Friend' | 'Other'
 export type BonusType = 'PayoutBoost' | 'DiscountPick' | 'FreeEntry' | 'ProtectedEntry' | 'Other'
+export type BankrollTransactionType = 'Deposit' | 'Withdrawal' | 'Adjustment'
 
 export type Platform = { id: string; name: string; type: PlatformType; isActive: boolean }
 export type BetSource = { id: string; name: string; type: SourceType; isActive: boolean }
@@ -15,7 +16,6 @@ export type Bet = {
   id: string
   platform: Platform
   source: BetSource | null
-  bankrollAccountId: string | null
   entryCost: number
   entryValue: number
   legCount: number
@@ -41,11 +41,38 @@ export type Bet = {
 export type BettingSummary = { totalBets: number; pendingBets: number; totalEntryCost: number; netProfit: number; roi: number | null }
 export type BetListResponse = { summary: BettingSummary; items: Bet[]; totalCount: number; page: number; pageSize: number }
 
+export type BankrollTransaction = {
+  id: string
+  type: BankrollTransactionType
+  platform: Platform | null
+  amount: number
+  targetBalance: number | null
+  occurredAtUtc: string
+  note: string | null
+}
+export type BettingToolExpense = { id: string; toolName: string; amount: number; incurredAtUtc: string; note: string | null }
+export type BettingFinanceSummary = {
+  betProfit: number
+  totalDeposits: number
+  totalWithdrawals: number
+  netCashFlow: number
+  totalAdjustments: number
+  currentBankroll: number
+  totalToolCosts: number
+  overallProfitAfterTools: number
+}
+export type BettingFinance = {
+  summary: BettingFinanceSummary
+  transactions: BankrollTransaction[]
+  toolExpenses: BettingToolExpense[]
+  transactionCount: number
+  toolExpenseCount: number
+}
+
 export type PayoutTierInput = { requiredCorrectLegs: number; basePayoutAmount: number | null; finalPayoutAmount: number }
 export type BetInput = {
   platformId: string
   sourceId: string | null
-  bankrollAccountId: string | null
   entryCost: number
   entryValue: number
   legCount: number
