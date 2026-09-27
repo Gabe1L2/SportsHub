@@ -68,6 +68,11 @@ export function FantasyPage() {
     document.addEventListener('keydown', blockHiddenAssistantShortcuts, true)
     return () => document.removeEventListener('keydown', blockHiddenAssistantShortcuts, true)
   }, [tab])
+  useEffect(() => {
+    if (tab !== 'assistant') return
+    const host = window as Window & { refreshOnTheClockWorkspace?: () => Promise<boolean> }
+    void host.refreshOnTheClockWorkspace?.()
+  }, [tab])
   function newDraft() { setError(''); setEditing(emptyDraft(platforms[0]?.id ?? '')) }
   function editDraft(draft: Draft) { setError(''); setEditing({ ...draft, leagueId: null }) }
 

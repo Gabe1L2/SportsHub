@@ -192,7 +192,7 @@ public static class FantasyEndpoints
             else
             {
                 var parts = sourceName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                var importedTeam = NormalizeTeam(row.TeamAbbreviation);
+                var importedTeam = NormalizeTeamAbbreviation(row.TeamAbbreviation);
                 var team = await ResolveTeamAsync(importedTeam, league, teams, db, cancellationToken);
                 player = new Player
                 {
@@ -210,9 +210,9 @@ public static class FantasyEndpoints
                 created = true;
             }
 
-            var imported = NormalizeTeam(row.TeamAbbreviation);
+            var imported = NormalizeTeamAbbreviation(row.TeamAbbreviation);
             var current = player.Team?.Abbreviation;
-            var teamConflict = !created && imported is not null && current is not null && !string.Equals(imported, current, StringComparison.OrdinalIgnoreCase);
+            var teamConflict = !created && imported is not null && current is not null && !string.Equals(imported, NormalizeTeamAbbreviation(current), StringComparison.OrdinalIgnoreCase);
             if (!created && imported is not null && current is null)
             {
                 player.Team = await ResolveTeamAsync(imported, league, teams, db, cancellationToken);
@@ -230,7 +230,7 @@ public static class FantasyEndpoints
     {
         var player = await db.Players.Include(x => x.League).Include(x => x.Team).SingleOrDefaultAsync(x => x.Id == id, cancellationToken);
         if (player is null) return Results.NotFound();
-        var abbreviation = NormalizeTeam(request.TeamAbbreviation);
+        var abbreviation = NormalizeTeamAbbreviation(request.TeamAbbreviation);
         var teams = await db.Teams.Where(x => x.LeagueId == player.LeagueId).ToDictionaryAsync(x => x.Abbreviation.ToUpper(), cancellationToken);
         player.Team = await ResolveTeamAsync(abbreviation, player.League, teams, db, cancellationToken);
         player.UpdatedAtUtc = DateTime.UtcNow;
@@ -309,11 +309,11 @@ public static class FantasyEndpoints
         if (existingNames.Any(x => NormalizePlayerName(x.DisplayName ?? $"{x.FirstName} {x.LastName}") == normalized)) return Results.Conflict(new { title = "That canonical NBA player already exists." });
 
         Team? team = null;
-        var abbreviation = request.TeamAbbreviation?.Trim().ToUpperInvariant();
+        var abbreviation = NormalizeTeamAbbreviation(request.TeamAbbreviation);
         if (!string.IsNullOrWhiteSpace(abbreviation))
         {
-            team = await db.Teams.SingleOrDefaultAsync(x => x.LeagueId == league.Id && x.Abbreviation == abbreviation, cancellationToken);
-            if (team is null) { team = new Team { Name = abbreviation, Abbreviation = abbreviation, League = league }; db.Teams.Add(team); }
+            var teams = await db.Teams.Where(x => x.LeagueId == league.Id).ToDictionaryAsync(x => x.Abbreviation.ToUpper(), cancellationToken);
+            team = await ResolveTeamAsync(abbreviation, league, teams, db, cancellationToken);
         }
         var player = new Player { FirstName = first, LastName = last, DisplayName = display, League = league, Team = team, Position = string.IsNullOrWhiteSpace(request.Position) ? null : request.Position.Trim() };
         db.Players.Add(player); await db.SaveChangesAsync(cancellationToken);
@@ -379,17 +379,32 @@ public static class FantasyEndpoints
     {
         if (abbreviation is null) return null;
         if (teams.TryGetValue(abbreviation, out var existing)) return existing;
+        existing = teams.Values.FirstOrDefault(x => string.Equals(NormalizeTeamAbbreviation(x.Abbreviation), abbreviation, StringComparison.Ordinal));
+        if (existing is not null) return existing;
         var team = await db.Teams.SingleOrDefaultAsync(x => x.LeagueId == league.Id && x.Abbreviation == abbreviation, cancellationToken);
         if (team is null) { team = new Team { Name = abbreviation, Abbreviation = abbreviation, League = league }; db.Teams.Add(team); }
         teams[abbreviation] = team;
         return team;
     }
 
-    private static string? NormalizeTeam(string? value)
+    public static string? NormalizeTeamAbbreviation(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
-        var team = value.Trim().ToUpperInvariant();
-        return team.Length <= 20 ? team : team[..20];
+        var team = new string(value.Trim().ToUpperInvariant().Where(char.IsLetterOrDigit).ToArray());
+        if (team.Length > 20) team = team[..20];
+        return team switch
+        {
+            "BRK" or "BK" => "BKN",
+            "CHO" => "CHA",
+            "GS" => "GSW",
+            "NO" or "NOH" or "NOR" => "NOP",
+            "NY" => "NYK",
+            "PHO" => "PHX",
+            "SA" => "SAS",
+            "UTAH" => "UTA",
+            "WSH" => "WAS",
+            _ => team
+        };
     }
 
     private static string? CleanPosition(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim()[..Math.Min(value.Trim().Length, 30)];

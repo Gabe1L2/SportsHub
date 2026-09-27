@@ -49,7 +49,14 @@ export function validateProjectionConfig(config,sources){
  if(STAT_KEYS.some(k=>!Number.isFinite(config.scoring[k])||Math.abs(config.scoring[k])>100)||STAT_KEYS.every(k=>config.scoring[k]===0))throw new Error('Scoring values must be between −100 and 100, with at least one nonzero value.');
 }
 export function nameMatches(state,room,sourceId){return room?.aliases?.[sourceId]??state.aliases?.[sourceId]??{};}
-export function canonicalId(state,source,player,room){return player.canonicalPlayerId||nameMatches(state,room,source.id)[player.id]||player.id;}
+export function canonicalId(state,source,player,room){
+ const explicit=nameMatches(state,room,source.id)[player.id];
+ if(explicit){
+  for(const candidateSource of state.sources){const target=candidateSource.players.find(p=>p.id===explicit);if(target?.canonicalPlayerId)return target.canonicalPlayerId;}
+  return explicit;
+ }
+ return player.canonicalPlayerId||player.id;
+}
 export function activeAdp(state,room){
  const source=state.sources.find(s=>s.id===room.adpSource&&s.kind==='adp'&&(s.platform===room.platform||s.platform==='All'));
  return {source,byPlayer:new Map((source?.players||[]).map(p=>[canonicalId(state,source,p,room),p]))};

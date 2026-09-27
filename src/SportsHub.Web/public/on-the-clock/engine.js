@@ -121,8 +121,9 @@ export function validateConfig(config) {
 export function validateBackup(data) {
   if(data?.version!==1||!Array.isArray(data.sources)||!Array.isArray(data.rooms)||!data.rooms.length) throw new Error('This is not an On the Clock backup.');
   const sourceIds=new Set();
-  function validPlayer(p){return p&&typeof p.id==='string'&&p.id===key(p.name)&&typeof p.name==='string'&&Array.isArray(p.pos)&&p.pos.every(g=>GROUPS.includes(g))&&(p.rank===null||Number.isFinite(p.rank)&&p.rank>0)&&(p.adp===null||Number.isFinite(p.adp)&&p.adp>0);}
-  for(const s of data.sources){if(typeof s.id!=='string'||!/^[a-zA-Z0-9_-]+$/.test(s.id)||sourceIds.has(s.id)||typeof s.name!=='string'||typeof s.raw!=='string'||s.archived!==undefined&&typeof s.archived!=='boolean'||!['ranking','adp','projection'].includes(s.kind)||!['Underdog','DraftKings','All'].includes(s.platform)||!Array.isArray(s.players)||s.players.some(p=>!validPlayer(p))||new Set(s.players.map(p=>p.id)).size!==s.players.length)throw new Error('Invalid source in backup.');sourceIds.add(s.id);}
+  const canonicalId=id=>typeof id==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
+  function validPlayer(p,sourceRow=false){return p&&typeof p.name==='string'&&typeof p.id==='string'&&(sourceRow?p.id===key(p.name):p.id===key(p.name)||canonicalId(p.id))&&(p.canonicalPlayerId===undefined||canonicalId(p.canonicalPlayerId))&&Array.isArray(p.pos)&&p.pos.every(g=>GROUPS.includes(g))&&(p.rank===null||Number.isFinite(p.rank)&&p.rank>0)&&(p.adp===null||Number.isFinite(p.adp)&&p.adp>0);}
+  for(const s of data.sources){if(typeof s.id!=='string'||!/^[a-zA-Z0-9_-]+$/.test(s.id)||sourceIds.has(s.id)||typeof s.name!=='string'||typeof s.raw!=='string'||s.archived!==undefined&&typeof s.archived!=='boolean'||!['ranking','adp','projection'].includes(s.kind)||!['Underdog','DraftKings','All'].includes(s.platform)||!Array.isArray(s.players)||s.players.some(p=>!validPlayer(p,true))||new Set(s.players.map(p=>p.id)).size!==s.players.length)throw new Error('Invalid source in backup.');sourceIds.add(s.id);}
   const playerIds=new Set(data.sources.flatMap(s=>s.players.map(p=>p.id)));
   for(const s of data.sources)if(s.kind==='projection'){
     if(!['perGame','totals'].includes(s.basis)||s.players.some(p=>!p.stats||STAT_KEYS.some(k=>p.stats[k]!==null&&(!Number.isFinite(p.stats[k])||p.stats[k]<0))||p.gp!==null&&(!Number.isFinite(p.gp)||p.gp<0||p.gp>100)))throw new Error('Invalid projection stats in backup.');
@@ -139,7 +140,7 @@ export function validateBackup(data) {
   validateAliases(data.aliases);
   const roomIds=new Set();
   for(const r of data.rooms){
-    if(!r||typeof r.id!=='string'||!/^[a-zA-Z0-9_-]+$/.test(r.id)||roomIds.has(r.id)||!['Underdog','DraftKings'].includes(r.platform)||typeof r.name!=='string'||!r.config?.targets||!r.config?.weights||!Array.isArray(r.picks)||!Array.isArray(r.redo)||!Array.isArray(r.watch)||r.watch.some(id=>typeof id!=='string'||!/^[a-z0-9]+$/.test(id)))throw new Error('Invalid draft room in backup.');
+    if(!r||typeof r.id!=='string'||!/^[a-zA-Z0-9_-]+$/.test(r.id)||roomIds.has(r.id)||!['Underdog','DraftKings'].includes(r.platform)||typeof r.name!=='string'||!r.config?.targets||!r.config?.weights||!Array.isArray(r.picks)||!Array.isArray(r.redo)||!Array.isArray(r.watch)||r.watch.some(id=>typeof id!=='string'||!(/^[a-z0-9]+$/.test(id)||canonicalId(id))))throw new Error('Invalid draft room in backup.');
     validateConfig(r.config);validateAliases(r.aliases);roomIds.add(r.id);
     if(r.orderMode!==undefined&&!['ranking','consensus'].includes(r.orderMode))throw new Error('Invalid board mode.');
     if(r.projections)validateProjectionConfig(r.projections,data.sources);
