@@ -140,7 +140,7 @@ export function validateBackup(data) {
   validateAliases(data.aliases);
   const roomIds=new Set();
   for(const r of data.rooms){
-    if(!r||typeof r.id!=='string'||!/^[a-zA-Z0-9_-]+$/.test(r.id)||roomIds.has(r.id)||!['Underdog','DraftKings'].includes(r.platform)||typeof r.name!=='string'||!r.config?.targets||!r.config?.weights||!Array.isArray(r.picks)||!Array.isArray(r.redo)||!Array.isArray(r.watch)||r.watch.some(id=>typeof id!=='string'||!(/^[a-z0-9]+$/.test(id)||canonicalId(id))))throw new Error('Invalid draft room in backup.');
+    if(!r||typeof r.id!=='string'||!/^[a-zA-Z0-9_-]+$/.test(r.id)||roomIds.has(r.id)||!['Underdog','DraftKings'].includes(r.platform)||typeof r.name!=='string'||r.archived!==undefined&&typeof r.archived!=='boolean'||!r.config?.targets||!r.config?.weights||!Array.isArray(r.picks)||!Array.isArray(r.redo)||!Array.isArray(r.watch)||r.watch.some(id=>typeof id!=='string'||!(/^[a-z0-9]+$/.test(id)||canonicalId(id))))throw new Error('Invalid draft room in backup.');
     validateConfig(r.config);validateAliases(r.aliases);roomIds.add(r.id);
     if(r.orderMode!==undefined&&!['ranking','consensus'].includes(r.orderMode))throw new Error('Invalid board mode.');
     if(r.projections)validateProjectionConfig(r.projections,data.sources);
@@ -150,6 +150,14 @@ export function validateBackup(data) {
     picks.forEach((p,i)=>{if(p.pick!==i+1||p.team!==snakeTeam(i+1,r.config.teams)||p.player&&(!validPlayer(p.player)||seen.has(p.player.id)))throw new Error('Invalid or duplicate pick in backup.');if(p.player)seen.add(p.player.id);});
   }
   if(!roomIds.has(data.active))throw new Error('Missing active draft room.');
+  return data;
+}
+export function ensureActiveRoom(data) {
+  const current=data.rooms.find(r=>r.id===data.active&&!r.archived);
+  if(current)return data;
+  let next=data.rooms.find(r=>!r.archived);
+  if(!next){const previous=data.rooms.find(r=>r.id===data.active)||data.rooms[0];next=newRoom(previous?.platform||'Underdog',previous?.rankSource||null,previous?.adpSource||null);data.rooms.push(next);}
+  data.active=next.id;
   return data;
 }
 export function newRoom(platform,rankSource=null,adpSource=null) {

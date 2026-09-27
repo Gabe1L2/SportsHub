@@ -107,17 +107,43 @@ public static class FantasyEndpoints
 
     private static async Task<IResult> ArchiveDraftAsync(Guid id, ClaimsPrincipal principal, SportsHubDbContext db, CancellationToken cancellationToken)
     {
-        var draft = await db.Drafts.SingleOrDefaultAsync(x => x.Id == id && x.UserId == UserId(principal), cancellationToken);
+        var userId = UserId(principal);
+        var draft = await db.Drafts.SingleOrDefaultAsync(x => x.Id == id && x.UserId == userId, cancellationToken);
         if (draft is null) return Results.NotFound();
         draft.IsArchived = true; draft.UpdatedAtUtc = DateTime.UtcNow;
+        if (draft.WorkspaceRoomId is not null)
+        {
+            var workspace = await db.FantasyWorkspaces.SingleOrDefaultAsync(x => x.UserId == userId, cancellationToken);
+            if (workspace is not null && JsonNode.Parse(workspace.StateJson) is JsonObject state && state["rooms"] is JsonArray rooms)
+            {
+                var room = rooms.OfType<JsonObject>().SingleOrDefault(x => x["id"]?.GetValue<string>() == draft.WorkspaceRoomId);
+                if (room is not null)
+                {
+                    room["archived"] = true;
+                    if (state["active"]?.GetValue<string>() == draft.WorkspaceRoomId)
+                    {
+                        var next = rooms.OfType<JsonObject>().FirstOrDefault(x => x["archived"]?.GetValue<bool>() != true);
+                        if (next?["id"]?.GetValue<string>() is { } nextId) state["active"] = nextId;
+                    }
+                    workspace.StateJson = state.ToJsonString(); workspace.UpdatedAtUtc = DateTime.UtcNow;
+                }
+            }
+        }
         await db.SaveChangesAsync(cancellationToken);
         return Results.NoContent();
     }
 
     private static async Task<IResult> GetWorkspaceAsync(ClaimsPrincipal principal, SportsHubDbContext db, CancellationToken cancellationToken)
     {
-        var json = await db.FantasyWorkspaces.AsNoTracking().Where(x => x.UserId == UserId(principal)).Select(x => x.StateJson).SingleOrDefaultAsync(cancellationToken);
-        return json is null ? Results.Ok(new { state = (object?)null }) : Results.Content($"{{\"state\":{json}}}", "application/json");
+        var userId = UserId(principal);
+        var json = await db.FantasyWorkspaces.AsNoTracking().Where(x => x.UserId == userId).Select(x => x.StateJson).SingleOrDefaultAsync(cancellationToken);
+        if (json is null) return Results.Ok(new { state = (object?)null });
+        if (JsonNode.Parse(json) is not JsonObject state) return Results.Problem("The saved fantasy workspace is invalid.", statusCode: 500);
+        var archivedRoomIds = await db.Drafts.AsNoTracking().Where(x => x.UserId == userId && x.IsArchived && x.WorkspaceRoomId != null).Select(x => x.WorkspaceRoomId!).ToHashSetAsync(cancellationToken);
+        if (state["rooms"] is JsonArray rooms)
+            foreach (var room in rooms.OfType<JsonObject>())
+                if (room["id"]?.GetValue<string>() is { } roomId && archivedRoomIds.Contains(roomId)) room["archived"] = true;
+        return Results.Ok(new { state });
     }
 
     private static async Task<IResult> SaveWorkspaceAsync(WorkspaceRequest request, ClaimsPrincipal principal, SportsHubDbContext db, CancellationToken cancellationToken)
