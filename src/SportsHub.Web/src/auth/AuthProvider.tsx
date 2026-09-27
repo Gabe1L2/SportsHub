@@ -5,7 +5,7 @@ import { api, type CurrentUser } from '../lib/api'
 type AuthContextValue = {
   user: CurrentUser | null
   loading: boolean
-  login: (email: string, password: string) => Promise<CurrentUser>
+  login: (email: string, password: string, rememberMe: boolean) => Promise<CurrentUser>
   logout: () => Promise<void>
 }
 
@@ -20,7 +20,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     staleTime: 60_000,
   })
   const loginMutation = useMutation({
-    mutationFn: (credentials: { email: string; password: string }) => api<CurrentUser>('/api/account/login', { method: 'POST', body: JSON.stringify(credentials) }),
+    mutationFn: (credentials: { email: string; password: string; rememberMe: boolean }) => api<CurrentUser>('/api/account/login', { method: 'POST', body: JSON.stringify(credentials) }),
     onSuccess: (user) => queryClient.setQueryData(['account', 'me'], user),
   })
   const logoutMutation = useMutation({
@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return <AuthContext.Provider value={{
     user: me.data ?? null,
     loading: me.isLoading,
-    login: (email, password) => loginMutation.mutateAsync({ email, password }),
+    login: (email, password, rememberMe) => loginMutation.mutateAsync({ email, password, rememberMe }),
     logout: () => logoutMutation.mutateAsync(),
   }}>{children}</AuthContext.Provider>
 }

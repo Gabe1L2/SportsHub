@@ -41,7 +41,9 @@ builder.Services.AddAuthentication(IdentityConstants.ApplicationScheme)
     options.Cookie.SameSite = SameSiteMode.Lax;
     options.Cookie.SecurePolicy = builder.Environment.IsProduction() ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
     options.SlidingExpiration = true;
-    options.ExpireTimeSpan = TimeSpan.FromHours(12);
+    // Non-persistent sign-ins remain session cookies. "Keep me logged in"
+    // persists the same protected ticket across browser restarts for 30 days.
+    options.ExpireTimeSpan = TimeSpan.FromDays(30);
     options.Events = new CookieAuthenticationEvents
     {
         OnRedirectToLogin = context => { context.Response.StatusCode = StatusCodes.Status401Unauthorized; return Task.CompletedTask; },
