@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using System.Text.Json.Serialization;
 using SportsHub.Api.Features.Account;
@@ -17,6 +18,9 @@ builder.Services.AddProblemDetails();
 builder.Services.AddOpenApi();
 builder.Services.ConfigureHttpJsonOptions(options => options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.AddSportsHubInfrastructure(builder.Configuration);
+builder.Services.AddDataProtection()
+    .SetApplicationName("SportsHub")
+    .PersistKeysToDbContext<SportsHubDbContext>();
 builder.Services
     .AddIdentityCore<ApplicationUser>(options =>
     {

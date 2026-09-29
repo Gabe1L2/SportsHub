@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using SportsHub.Domain.Betting;
@@ -8,8 +9,9 @@ using SportsHub.Infrastructure.Identity;
 namespace SportsHub.Infrastructure.Persistence;
 
 public sealed class SportsHubDbContext(DbContextOptions<SportsHubDbContext> options)
-    : IdentityDbContext<ApplicationUser>(options)
+    : IdentityDbContext<ApplicationUser>(options), IDataProtectionKeyContext
 {
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
     public DbSet<Sport> Sports => Set<Sport>();
     public DbSet<League> Leagues => Set<League>();
     public DbSet<Team> Teams => Set<Team>();
@@ -33,6 +35,7 @@ public sealed class SportsHubDbContext(DbContextOptions<SportsHubDbContext> opti
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
+        builder.Entity<DataProtectionKey>().ToTable("DataProtectionKeys", "security");
         ConfigureSports(builder);
         ConfigureFantasy(builder);
         ConfigureBetting(builder);
