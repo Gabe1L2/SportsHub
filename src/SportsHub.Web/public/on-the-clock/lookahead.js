@@ -9,19 +9,22 @@ function normal(id,trial){
  let h=hash(id+':'+trial);const random=()=>{h+=0x6D2B79F5;let t=h;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)+1;};
  return Math.sqrt(-2*Math.log(random()/4294967297))*Math.cos(2*Math.PI*random()/4294967297);
 }
-export function lookAhead({pool,available,roster,fit,room,pick,myPick,following,allocate}){
- const cfg={...GUIDANCE_DEFAULTS,...room.config.guidance},consensus=room.orderMode==='consensus';
+export function lookAhead({pool,available,roster,fit,lineupFit,room,pick,myPick,following,allocate,allocateBestBallLineup}){
+ const cfg={...GUIDANCE_DEFAULTS,...room.config.guidance},consensus=room.orderMode==='consensus',bestBall=room.platform==='Underdog';
  const rankOf=p=>consensus?p.consensusRank:p.rank;
  const maxRank=Math.max(1,...pool.map(p=>rankOf(p)||0));
  const value=p=>consensus?p.adjusted:100*(1-(p.rank-1)/maxRank);
  const qualified=p=>Number.isFinite(rankOf(p))&&Number.isFinite(value(p));
  const groups=Array.from({length:8},()=>[]),single=[],pair=[];
+ const coverage=players=>bestBall?allocateBestBallLineup(players).filled:allocate(players,room.config.targets).filled;
+ const baseline=bestBall?lineupFit.filled:fit.filled;
+ const lineupUrgency=bestBall?1+2*Math.min(1,roster.length/5):1;
  for(let m=0;m<8;m++){
-  single[m]=allocate([...roster,position(m)],room.config.targets).filled-fit.filled;
+  single[m]=coverage([...roster,position(m)])-baseline;
   pair[m]=[];
-  for(let n=0;n<8;n++)pair[m][n]=allocate([...roster,position(m),position(n)],room.config.targets).filled-fit.filled;
+  for(let n=0;n<8;n++)pair[m][n]=coverage([...roster,position(m),position(n)])-baseline;
  }
- const candidates=available.filter(qualified).map(p=>({...p,baseValue:value(p),improves:single[mask(p)]>0,needScore:100*single[mask(p)],rosterBonus:cfg.needBonus*single[mask(p)],unlikely:following!==null&&p.adp!==null&&p.adp<following,expectedNext:null,nextPlayer:null,nextFrequency:null,waitChance:null,myChance:null,samples:0,uncovered:0}));
+ const candidates=available.filter(qualified).map(p=>({...p,baseValue:value(p),improves:single[mask(p)]>0,lineupGain:bestBall?single[mask(p)]:0,needScore:100*single[mask(p)],rosterBonus:cfg.needBonus*lineupUrgency*single[mask(p)],unlikely:following!==null&&p.adp!==null&&p.adp<following,expectedNext:null,nextPlayer:null,nextFrequency:null,waitChance:null,myChance:null,samples:0,uncovered:0}));
  const before=myPick===null?0:myPick-pick,between=following===null?0:following-myPick-1;
  const missingAdp=available.filter(p=>!Number.isFinite(p.adp)).length;
  let reason=null;
@@ -31,7 +34,7 @@ export function lookAhead({pool,available,roster,fit,room,pick,myPick,following,
  else if(room.picks.some(p=>!p.player))reason='Resolve unknown picks in pick history to model the remaining pool. Showing immediate value.';
  else if(available.length<=before+between+1)reason='The imported player pool is too small to model a second pick. Showing immediate value.';
  const active=reason===null;
- const meta={active,reason,missingAdp,scenarios:active?SCENARIOS:0,before,between,myPick,following,consensus,unit:consensus?'adjusted FP/G':'rank-value points',...cfg};
+ const meta={active,reason,missingAdp,scenarios:active?SCENARIOS:0,before,between,myPick,following,consensus,bestBall,lineupUrgency,unit:consensus?'adjusted FP/G':'rank-value points',...cfg};
  if(!active){for(const p of candidates){p.score=p.baseValue+p.rosterBonus;p.pairProjection=null;}return finish();}
  const market=available.map((p,i)=>({id:p.id,index:i,adp:Number.isFinite(p.adp)?p.adp:rankOf(p)||maxRank+1}));
  const indexById=new Map(market.map(p=>[p.id,p.index]));
@@ -54,7 +57,7 @@ export function lookAhead({pool,available,roster,fit,room,pick,myPick,following,
    let next=null,best=-Infinity,bonus=0;
    for(let m=0;m<8;m++){
     const q=survivors[shift][m].find(q=>q.id!==p.id);if(!q)continue;
-    const extra=cfg.needBonus*(pair[pm][m]-single[pm]),utility=q.baseValue+extra;
+    const extra=cfg.needBonus*lineupUrgency*(pair[pm][m]-single[pm]),utility=q.baseValue+extra;
     if(utility>best||utility===best&&q.id<(next?.id||'')){next=q;best=utility;bonus=extra;}
    }
    if(next){sum.next+=next.baseValue+bonus;sum.projection+=next.baseValue;sum.partners.set(next.id,(sum.partners.get(next.id)||0)+1);}else p.uncovered++;

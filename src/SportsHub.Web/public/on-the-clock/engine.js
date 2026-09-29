@@ -82,6 +82,19 @@ export function allocate(roster,targets) {
   const deficits=Object.fromEntries(GROUPS.map(g=>[g,Math.max(0,targets[g]-groups[g].length)]));
   return {groups,flex,deficits,filled:used.size};
 }
+export function allocateBestBallLineup(roster) {
+  const slots=['G','G','F','F','C','X'],assigned=Array(slots.length).fill(-1);
+  function eligible(player,slot){return slot==='X'?player.pos.length>0:player.pos.includes(slot);}
+  function visit(pi,seen){
+    for(let si=0;si<slots.length;si++)if(eligible(roster[pi],slots[si])&&!seen.has(si)){
+      seen.add(si);
+      if(assigned[si]<0||visit(assigned[si],seen)){assigned[si]=pi;return true;}
+    }
+    return false;
+  }
+  roster.forEach((_,i)=>visit(i,new Set()));
+  return {filled:assigned.filter(i=>i>=0).length};
+}
 export function poolFor(state,room) {
   const ranking=state.sources.find(s=>s.id===room.rankSource);
   const {source:adpSource,byPlayer:adps}=activeAdp(state,room);
@@ -93,15 +106,15 @@ export function analysis(state,room) {
   const poolById=new Map(pool.map(p=>[p.id,p])),market=activeAdp(state,room);
   const roster=room.picks.filter(p=>p.team===room.config.slot&&p.player).map(({player})=>{const current=poolById.get(player.id);return platformPosition({...player,pos:current?.pos||player.pos,posRaw:current?.posRaw??player.posRaw},market.byPlayer.get(player.id),market.source);});
   const mineCount=room.picks.filter(p=>p.team===room.config.slot).length,remaining=room.config.rounds-mineCount;
-  const fit=allocate(roster,room.config.targets),pick=room.picks.length+1;
+  const fit=allocate(roster,room.config.targets),lineupFit=allocateBestBallLineup(roster),pick=room.picks.length+1;
   const myPick=nextMine(room),following=myPick===null ? null : nextMine(room,myPick);
   const available=pool.filter(p=>!picked.has(p.id));
-  const {candidates,guidance}=lookAhead({pool,available,roster,fit,room,pick,myPick,following,allocate});
+  const {candidates,guidance}=lookAhead({pool,available,roster,fit,lineupFit,room,pick,myPick,following,allocate,allocateBestBallLineup});
   const shortages=GROUPS.map(g=>{
     const supply=available.filter(p=>p.pos.includes(g)).length,need=fit.deficits[g];
     return {group:g,need,supply,critical:need>0&&(supply<need||Object.values(fit.deficits).reduce((a,b)=>a+b,0)>=remaining),thin:need>0&&supply<=need*2};
   });
-  return {pool,roster,fit,pick,myPick,following,available,candidates,guidance,remaining,shortages,mineCount,complete:pick>room.config.teams*room.config.rounds};
+  return {pool,roster,fit,lineupFit,pick,myPick,following,available,candidates,guidance,remaining,shortages,mineCount,complete:pick>room.config.teams*room.config.rounds};
 }
 export function recordPick(room,player) {
   if(room.picks.length>=room.config.teams*room.config.rounds) throw new Error('This draft is complete.');
