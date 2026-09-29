@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import type { BettingLookups, Platform } from '../features/betting/types'
@@ -17,6 +17,11 @@ type FantasySource = { id: string; name: string; kind: 'ranking' | 'adp' | 'proj
 type FantasyWorkspaceState = { sources: FantasySource[] } & Record<string, unknown>
 type WorkspaceResponse = { state: FantasyWorkspaceState | null }
 type ReconciledPlayer = { sourceName: string; playerId: string; canonicalName: string; matchType: string; created: boolean; currentTeam: string | null; importedTeam: string | null; teamConflict: boolean }
+type DraftFilters = { search: string; status: '' | DraftStatus; platformId: string; sort: string }
+type DraftViewMode = 'comfortable' | 'compact'
+
+const initialDraftFilters: DraftFilters = { search: '', status: '', platformId: '', sort: 'newest' }
+const draftStatuses: DraftStatus[] = ['Scheduled', 'InProgress', 'Active', 'Completed', 'Cancelled']
 
 const field = 'mt-1.5 w-full rounded-xl border border-white/15 bg-[#0b1626] px-3 py-2.5 text-sm text-white outline-none focus:border-violet-400'
 const secondary = 'rounded-xl border border-white/15 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/5 disabled:opacity-50'
@@ -26,6 +31,9 @@ export function FantasyPage() {
   const [tab, setTab] = useState<Tab>('tracker')
   const [editing, setEditing] = useState<DraftInput & { id?: string } | null>(null)
   const [error, setError] = useState('')
+  const [draftFilters, setDraftFilters] = useState(initialDraftFilters)
+  const [draftFiltersOpen, setDraftFiltersOpen] = useState(false)
+  const [draftViewMode, setDraftViewMode] = useState<DraftViewMode>(() => localStorage.getItem('fantasy-draft-view-mode') === 'compact' ? 'compact' : 'comfortable')
   const client = useQueryClient()
   const summary = useQuery({ queryKey: ['fantasy', 'summary'], queryFn: () => api<Summary>('/api/fantasy/summary') })
   const drafts = useQuery({ queryKey: ['fantasy', 'drafts'], queryFn: () => api<Draft[]>('/api/fantasy/drafts') })
@@ -41,6 +49,24 @@ export function FantasyPage() {
   })
 
   const platforms = lookups.data?.platforms.filter(x => x.isActive) ?? []
+  useEffect(() => { localStorage.setItem('fantasy-draft-view-mode', draftViewMode) }, [draftViewMode])
+  const visibleDrafts = useMemo(() => {
+    const search = draftFilters.search.trim().toLocaleLowerCase()
+    const filtered = (drafts.data ?? []).filter(draft => (!search || `${draft.name} ${draft.sportName} ${draft.platformName} ${draft.notes ?? ''}`.toLocaleLowerCase().includes(search)) && (!draftFilters.status || draft.status === draftFilters.status) && (!draftFilters.platformId || draft.platformId === draftFilters.platformId))
+    const when = (draft: Draft) => new Date(draft.startedAtUtc ?? draft.scheduledAtUtc ?? 0).getTime()
+    return [...filtered].sort((a, b) => draftFilters.sort === 'oldest' ? when(a) - when(b)
+      : draftFilters.sort === 'buyInDesc' ? b.buyIn - a.buyIn
+      : draftFilters.sort === 'buyInAsc' ? a.buyIn - b.buyIn
+      : draftFilters.sort === 'winningsDesc' ? (b.winnings ?? -1) - (a.winnings ?? -1)
+      : draftFilters.sort === 'pnlDesc' ? (b.profitLoss ?? -Infinity) - (a.profitLoss ?? -Infinity)
+      : draftFilters.sort === 'pnlAsc' ? (a.profitLoss ?? Infinity) - (b.profitLoss ?? Infinity)
+      : draftFilters.sort === 'finish' ? (a.finishingPlace ?? Infinity) - (b.finishingPlace ?? Infinity)
+      : draftFilters.sort === 'name' ? a.name.localeCompare(b.name)
+      : draftFilters.sort === 'status' ? a.status.localeCompare(b.status) || when(b) - when(a)
+      : when(b) - when(a))
+  }, [drafts.data, draftFilters])
+  const draftListFiltered = draftFilters.search || draftFilters.status || draftFilters.platformId
+  function setDraftFilter<K extends keyof DraftFilters>(key: K, value: DraftFilters[K]) { setDraftFilters(current => ({ ...current, [key]: value })) }
   useEffect(() => {
     const host = window as Window & { mountOnTheClock?: () => void }
     let styles = document.getElementById('on-the-clock-embedded-styles') as HTMLStyleElement | null
@@ -87,7 +113,7 @@ export function FantasyPage() {
   return <section>
     <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
       <div><p className="text-sm font-bold uppercase tracking-[.22em] text-violet-300">Fantasy</p><h1 className="mt-2 text-4xl font-black tracking-tight md:text-5xl">{tab === 'assistant' ? 'Draft room' : tab === 'sources' ? 'Source library' : tab === 'aliases' ? 'Player identity' : 'Fantasy results'}</h1><p className="mt-3 max-w-3xl text-slate-400">{tab === 'assistant' ? 'Your board, projections, live picks, and roster decisions in one workspace.' : tab === 'sources' ? 'Inspect every imported ranking, ADP, and projection row feeding your draft room.' : tab === 'aliases' ? 'Teach SportsHub the nicknames and source spellings that belong to each player.' : 'Track every entry, finish, payout, and fantasy result without mixing it into betting P&L.'}</p></div>
-      {tab === 'tracker' && <button className={primary} onClick={newDraft} disabled={!platforms.length}>+ Track a draft</button>}
+      {tab === 'tracker' && <div className="flex flex-wrap gap-2"><div className="flex rounded-xl border border-white/15 bg-white/5 p-1" aria-label="Draft results view"><button className={`rounded-lg px-3 py-2 text-sm font-semibold ${draftViewMode === 'comfortable' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`} onClick={() => setDraftViewMode('comfortable')}>Comfortable</button><button className={`rounded-lg px-3 py-2 text-sm font-semibold ${draftViewMode === 'compact' ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`} onClick={() => setDraftViewMode('compact')}>Compact</button></div><button className={primary} onClick={newDraft} disabled={!platforms.length}>+ Track a draft</button></div>}
     </div>
 
     <div className="mt-7 flex gap-1 overflow-x-auto rounded-xl border border-white/10 bg-white/[.03] p-1">
@@ -104,8 +130,17 @@ export function FantasyPage() {
         <Metric label="Total sports P&L" value={summary.data ? signedMoney(summary.data.totalSportsProfit) : '—'} detail="Betting + fantasy" tone={tone(summary.data?.totalSportsProfit)} />
       </div>
       {!platforms.length && <div className="mt-6 rounded-xl border border-amber-300/20 bg-amber-300/10 p-4 text-sm text-amber-100">Add an active platform from Betting → Manage platforms before tracking a fantasy draft. The same DraftKings or Underdog platform is used by both areas.</div>}
-      <div className="mt-7 overflow-hidden rounded-2xl border border-white/10 bg-white/[.025]">
-        {drafts.isLoading ? <div className="p-6 text-slate-400">Loading drafts…</div> : drafts.error ? <div className="p-6 text-rose-300">{drafts.error.message}</div> : !drafts.data?.length ? <div className="p-10 text-center"><h2 className="text-xl font-bold">No fantasy drafts tracked yet</h2><p className="mt-2 text-sm text-slate-400">Add a contest to start measuring fantasy performance separately from betting.</p></div> : <div className="divide-y divide-white/10">{drafts.data.map(draft => <DraftRow key={draft.id} draft={draft} onEdit={() => editDraft(draft)} onArchive={() => { if (window.confirm(`Archive ${draft.name}?`)) archive.mutate(draft.id) }} />)}</div>}
+      <div className="mt-6 rounded-2xl border border-white/10 bg-white/[.035] p-3 sm:p-4">
+        <div className="flex gap-2 md:contents"><input className={`${field.replace('mt-1.5 ', '')} min-w-0 flex-1`} type="search" placeholder="Search drafts" value={draftFilters.search} onChange={event => setDraftFilter('search', event.target.value)} /><button type="button" className={`${secondary} shrink-0 md:hidden`} onClick={() => setDraftFiltersOpen(open => !open)}>Filters{draftListFiltered ? ' •' : ''} {draftFiltersOpen ? '▲' : '▼'}</button></div>
+        <div className={`${draftFiltersOpen ? 'grid' : 'hidden'} mt-3 grid-cols-2 gap-2 md:mt-0 md:grid md:grid-cols-3 md:gap-3`}>
+          <select className={field.replace('mt-1.5 ', '')} value={draftFilters.status} onChange={event => setDraftFilter('status', event.target.value as DraftFilters['status'])}><option value="">All statuses</option>{draftStatuses.map(status => <option key={status} value={status}>{displayStatus(status)}</option>)}</select>
+          <select className={field.replace('mt-1.5 ', '')} value={draftFilters.platformId} onChange={event => setDraftFilter('platformId', event.target.value)}><option value="">All platforms</option>{lookups.data?.platforms.map(platform => <option key={platform.id} value={platform.id}>{platform.name}</option>)}</select>
+          <select className={field.replace('mt-1.5 ', '')} value={draftFilters.sort} onChange={event => setDraftFilter('sort', event.target.value)}><option value="newest">Newest first</option><option value="oldest">Oldest first</option><option value="buyInDesc">Highest buy-in</option><option value="buyInAsc">Lowest buy-in</option><option value="winningsDesc">Highest winnings</option><option value="pnlDesc">Highest P&amp;L</option><option value="pnlAsc">Lowest P&amp;L</option><option value="finish">Best finish</option><option value="status">Status</option><option value="name">Draft name</option></select>
+        </div>
+        <div className={`${draftFiltersOpen ? 'flex' : 'hidden'} mt-3 items-center justify-between gap-3 md:flex`}><p className="text-xs text-slate-500">Showing {visibleDrafts.length} of {drafts.data?.length ?? 0} drafts</p>{draftListFiltered && <button className="text-xs font-semibold text-violet-300 hover:text-violet-200" onClick={() => setDraftFilters(current => ({ ...initialDraftFilters, sort: current.sort }))}>Clear filters</button>}</div>
+      </div>
+      <div className="mt-5">
+        {drafts.isLoading ? <div className="rounded-2xl border border-white/10 bg-white/[.025] p-6 text-slate-400">Loading drafts…</div> : drafts.error ? <div className="rounded-2xl border border-rose-400/20 bg-rose-400/10 p-6 text-rose-300">{drafts.error.message}</div> : !drafts.data?.length ? <div className="rounded-2xl border border-white/10 bg-white/[.025] p-10 text-center"><h2 className="text-xl font-bold">No fantasy drafts tracked yet</h2><p className="mt-2 text-sm text-slate-400">Add a contest to start measuring fantasy performance separately from betting.</p></div> : !visibleDrafts.length ? <div className="rounded-2xl border border-white/10 bg-white/[.025] p-10 text-center"><h2 className="text-xl font-bold">No drafts match these filters</h2><p className="mt-2 text-sm text-slate-400">Try clearing one or more filters.</p></div> : draftViewMode === 'compact' ? <CompactDraftTable drafts={visibleDrafts} onEdit={editDraft} onArchive={draft => { if (window.confirm(`Archive ${draft.name}?`)) archive.mutate(draft.id) }} busy={archive.isPending} /> : <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/[.025]"><div className="divide-y divide-white/10">{visibleDrafts.map(draft => <DraftRow key={draft.id} draft={draft} onEdit={() => editDraft(draft)} onArchive={() => { if (window.confirm(`Archive ${draft.name}?`)) archive.mutate(draft.id) }} />)}</div></div>}
       </div>
     </>}
 
@@ -194,6 +229,45 @@ function SourceLibrary() {
 function Metric({ label, value, detail, tone: color }: { label: string; value: string; detail: string; tone?: 'positive' | 'negative' }) {
   return <div className="rounded-2xl border border-white/10 bg-white/[.04] p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</p><p className={`mt-2 text-xl font-black ${color === 'positive' ? 'text-emerald-300' : color === 'negative' ? 'text-rose-300' : ''}`}>{value}</p><p className="mt-1 text-xs text-slate-500">{detail}</p></div>
 }
+
+function CompactDraftTable({ drafts, onEdit, onArchive, busy }: { drafts: Draft[]; onEdit: (draft: Draft) => void; onArchive: (draft: Draft) => void; busy: boolean }) {
+  const columns = 'grid-cols-[120px_minmax(180px,1.4fr)_130px_105px_80px_70px_90px_75px_95px_95px_105px]'
+  return <div className="relative left-1/2 w-[calc(100vw-2rem)] max-w-[1700px] -translate-x-1/2">
+    <div className="divide-y divide-white/[.07] overflow-hidden rounded-xl border border-white/10 bg-[#0b1626] shadow-xl shadow-black/10 md:hidden">{drafts.map((draft, index) => <MobileCompactDraftRow key={draft.id} draft={draft} alternate={index % 2 === 1} onEdit={() => onEdit(draft)} onArchive={() => onArchive(draft)} busy={busy} />)}</div>
+    <div className="hidden max-h-[68vh] overflow-auto rounded-xl border border-white/10 bg-[#0b1626] shadow-xl shadow-black/10 md:block">
+      <div className={`sticky top-0 z-10 grid min-w-[1250px] ${columns} items-center gap-2 border-b border-white/15 bg-[#111d2e] px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-400`}><span>Date</span><span>Draft</span><span>Platform</span><span>Status</span><span>Entrants</span><span>Slot</span><span>Buy-in</span><span>Finish</span><span>Winnings</span><span>P&amp;L</span><span className="text-right">Actions</span></div>
+      <div className="min-w-[1250px] divide-y divide-white/[.06]">{drafts.map((draft, index) => <CompactDraftRow key={draft.id} draft={draft} columns={columns} alternate={index % 2 === 1} onEdit={() => onEdit(draft)} onArchive={() => onArchive(draft)} busy={busy} />)}</div>
+    </div>
+  </div>
+}
+
+function MobileCompactDraftRow({ draft, alternate, onEdit, onArchive, busy }: { draft: Draft; alternate: boolean; onEdit: () => void; onArchive: () => void; busy: boolean }) {
+  const when = draft.startedAtUtc ?? draft.scheduledAtUtc
+  return <article className={`px-3 py-2.5 ${alternate ? 'bg-white/[.018]' : ''}`}>
+    <div className="flex min-w-0 items-center justify-between gap-3"><strong className="truncate text-sm text-slate-100">{draft.name}</strong><strong className="shrink-0 text-sm tabular-nums">{money(draft.buyIn)}</strong></div>
+    <div className="mt-1 flex items-center justify-between gap-3 text-[11px] text-slate-500"><span className="truncate">{draft.platformName}{when ? ` · ${new Date(when).toLocaleDateString()}` : ''} · {draft.entrantCount.toLocaleString()} entries</span><span className={`shrink-0 font-semibold ${tone(draft.profitLoss) === 'positive' ? 'text-emerald-300' : tone(draft.profitLoss) === 'negative' ? 'text-rose-300' : 'text-slate-500'}`}>{draft.profitLoss == null ? '—' : signedMoney(draft.profitLoss)}</span></div>
+    <div className="mt-2 flex items-center justify-between gap-2"><span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${draftStatusClass(draft.status)}`}>{displayStatus(draft.status)}</span><span className="flex shrink-0 gap-3 text-[11px]"><button className="font-semibold text-violet-300" onClick={onEdit}>Edit</button><button disabled={busy} className="font-semibold text-slate-500" onClick={onArchive}>Archive</button></span></div>
+  </article>
+}
+
+function CompactDraftRow({ draft, columns, alternate, onEdit, onArchive, busy }: { draft: Draft; columns: string; alternate: boolean; onEdit: () => void; onArchive: () => void; busy: boolean }) {
+  const when = draft.startedAtUtc ?? draft.scheduledAtUtc
+  return <div className={`grid ${columns} items-center gap-2 px-3 py-1.5 text-xs transition hover:bg-violet-400/[.055] ${alternate ? 'bg-white/[.018]' : ''}`}>
+    <span className="whitespace-nowrap tabular-nums text-slate-400">{when ? new Date(when).toLocaleDateString(undefined, { month: 'numeric', day: 'numeric', year: '2-digit' }) : '—'}</span>
+    <span className="truncate font-semibold text-slate-100" title={draft.name}>{draft.name}</span>
+    <span className="truncate text-slate-400">{draft.platformName}</span>
+    <span><span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${draftStatusClass(draft.status)}`}>{displayStatus(draft.status)}</span></span>
+    <span className="tabular-nums text-slate-300">{draft.entrantCount.toLocaleString()}</span>
+    <span className="tabular-nums text-slate-400">{draft.draftSlot ?? '—'}</span>
+    <span className="whitespace-nowrap tabular-nums font-semibold text-slate-200">{money(draft.buyIn)}</span>
+    <span className="tabular-nums text-slate-300">{draft.finishingPlace ? ordinal(draft.finishingPlace) : '—'}</span>
+    <span className="whitespace-nowrap tabular-nums text-slate-300">{draft.winnings == null ? '—' : money(draft.winnings)}</span>
+    <span className={`whitespace-nowrap tabular-nums font-semibold ${draft.profitLoss == null ? 'text-slate-600' : draft.profitLoss >= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>{draft.profitLoss == null ? '—' : signedMoney(draft.profitLoss)}</span>
+    <span className="flex justify-end gap-2 whitespace-nowrap"><button className="font-semibold text-violet-300 hover:text-violet-200" onClick={onEdit}>Edit</button><button disabled={busy} className="font-semibold text-slate-500 hover:text-slate-300" onClick={onArchive}>Archive</button></span>
+  </div>
+}
+
+function draftStatusClass(status: DraftStatus) { return status === 'Completed' ? 'bg-emerald-400/10 text-emerald-300' : status === 'Cancelled' ? 'bg-slate-400/10 text-slate-400' : status === 'InProgress' || status === 'Active' ? 'bg-amber-400/10 text-amber-300' : 'bg-violet-400/10 text-violet-300' }
 
 function DraftRow({ draft, onEdit, onArchive }: { draft: Draft; onEdit: () => void; onArchive: () => void }) {
   const when = draft.startedAtUtc ?? draft.scheduledAtUtc
