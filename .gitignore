@@ -26,9 +26,16 @@ src/SportsHub.Web/dist/
 .env
 .env.*
 !.env.example
+**/appsettings.Production.json
+**/appsettings.Local.json
+**/appsettings.*.local.json
 *.publishSettings
 *.pubxml.user
 secrets.json
+*.pem
+*.key
+*.pfx
+*.p12
 
 # Editors / OS / logs / temporary files
 .vs/
@@ -47,3 +54,14 @@ desktop.ini
 *.bak
 *.bacpac
 *.bcp
+*.db
+*.sqlite
+*.sqlite3
+
+# Local data exports (force-add only intentionally sanitized fixtures)
+*.csv
+*.tsv
+*.xls
+*.xlsx
+*.jsonl
+*.ndjson
