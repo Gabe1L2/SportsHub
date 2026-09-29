@@ -138,6 +138,15 @@ export function validateBackup(data) {
     }
   }
   validateAliases(data.aliases);
+  if(data.draftDefaults!==undefined){
+    if(!data.draftDefaults||typeof data.draftDefaults!=='object'||Array.isArray(data.draftDefaults)||Object.keys(data.draftDefaults).some(platform=>!['Underdog','DraftKings'].includes(platform)))throw new Error('Invalid saved draft defaults.');
+    for(const [platform,setup] of Object.entries(data.draftDefaults)){
+      if(!setup||typeof setup!=='object'||!setup.config?.targets||!setup.config?.weights||!['ranking','consensus'].includes(setup.orderMode))throw new Error(`Invalid ${platform} draft defaults.`);
+      validateConfig(setup.config);validateAliases(setup.aliases);
+      if(setup.projections)validateProjectionConfig(setup.projections,data.sources);
+      if(setup.rankSource&&!sourceIds.has(setup.rankSource)||setup.adpSource&&!sourceIds.has(setup.adpSource))throw new Error('Missing source for saved draft defaults.');
+    }
+  }
   const roomIds=new Set();
   for(const r of data.rooms){
     if(!r||typeof r.id!=='string'||!/^[a-zA-Z0-9_-]+$/.test(r.id)||roomIds.has(r.id)||!['Underdog','DraftKings'].includes(r.platform)||typeof r.name!=='string'||r.archived!==undefined&&typeof r.archived!=='boolean'||!r.config?.targets||!r.config?.weights||!Array.isArray(r.picks)||!Array.isArray(r.redo)||!Array.isArray(r.watch)||r.watch.some(id=>typeof id!=='string'||!(/^[a-z0-9]+$/.test(id)||canonicalId(id))))throw new Error('Invalid draft room in backup.');
@@ -153,12 +162,36 @@ export function validateBackup(data) {
   return data;
 }
 export function ensureActiveRoom(data) {
+  for(const room of data.rooms){
+    let selected=data.sources.find(source=>source.id===room.adpSource&&source.kind==='adp'),replacement;
+    while(selected?.archived&&(replacement=[...data.sources].reverse().find(source=>source.kind==='adp'&&!source.archived&&source.replaces===selected.id))){room.adpSource=replacement.id;selected=replacement;}
+  }
+  for(const setup of Object.values(data.draftDefaults||{})){
+    let selected=data.sources.find(source=>source.id===setup.adpSource&&source.kind==='adp'),replacement;
+    while(selected?.archived&&(replacement=[...data.sources].reverse().find(source=>source.kind==='adp'&&!source.archived&&source.replaces===selected.id))){setup.adpSource=replacement.id;selected=replacement;}
+  }
   const current=data.rooms.find(r=>r.id===data.active&&!r.archived);
   if(current)return data;
   let next=data.rooms.find(r=>!r.archived);
-  if(!next){const previous=data.rooms.find(r=>r.id===data.active)||data.rooms[0];next=newRoom(previous?.platform||'Underdog',previous?.rankSource||null,previous?.adpSource||null);data.rooms.push(next);}
+  if(!next){const previous=data.rooms.find(r=>r.id===data.active)||data.rooms[0];next=newRoomFromDefaults(data,previous?.platform||'Underdog',previous);data.rooms.push(next);}
   data.active=next.id;
   return data;
+}
+export function rememberDraftDefaults(data,room) {
+  data.draftDefaults??={};
+  data.draftDefaults[room.platform]={orderMode:room.orderMode||'ranking',projections:structuredClone(room.projections||projectionDefaults(room.platform)),rankSource:room.rankSource||null,adpSource:room.adpSource||null,aliases:structuredClone(room.aliases||{}),config:structuredClone(room.config)};
+}
+export function newRoomFromDefaults(data,platform,fallback=null) {
+  const setup=data.draftDefaults?.[platform]||(fallback?.platform===platform?fallback:[...data.rooms].reverse().find(room=>room.platform===platform));
+  const supportsPlatform=source=>source.platform==='All'||source.platform===platform;
+  const activeRankings=data.sources.filter(source=>source.kind==='ranking'&&!source.archived&&supportsPlatform(source));
+  const activeAdp=data.sources.filter(source=>source.kind==='adp'&&!source.archived&&supportsPlatform(source));
+  const savedRank=activeRankings.find(source=>source.id===setup?.rankSource);
+  const rankSource=(savedRank&&!savedRank.demo?savedRank:activeRankings.find(source=>!source.demo)||savedRank||activeRankings[0])?.id||null;
+  const adpSource=activeAdp.find(source=>source.id===setup?.adpSource)?.id||activeAdp[0]?.id||null;
+  const next=newRoom(platform,rankSource,adpSource);
+  if(setup){next.config=structuredClone(setup.config);next.aliases=structuredClone(setup.aliases||{});next.projections=structuredClone(setup.projections||projectionDefaults(platform));next.orderMode=setup.orderMode||'ranking';}
+  return next;
 }
 export function newRoom(platform,rankSource=null,adpSource=null) {
   return {id:crypto.randomUUID(),platform,name:`${platform} draft`,orderMode:'ranking',projections:projectionDefaults(platform),rankSource,adpSource,picks:[],redo:[],watch:[],config:{guidance:{...GUIDANCE_DEFAULTS},teams:12,slot:2,rounds:16,targets:{G:5,F:5,C:3},weights:{rank:65,adp:20,need:15}}};

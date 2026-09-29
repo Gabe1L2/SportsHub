@@ -73,6 +73,14 @@ export function FantasyPage() {
     const host = window as Window & { refreshOnTheClockWorkspace?: () => Promise<boolean> }
     void host.refreshOnTheClockWorkspace?.()
   }, [tab])
+  async function selectTab(next: Tab) {
+    if (tab === 'assistant' && next === 'tracker') {
+      const host = window as Window & { flushOnTheClockWorkspace?: () => Promise<boolean> }
+      await host.flushOnTheClockWorkspace?.()
+      await Promise.all([client.refetchQueries({ queryKey: ['fantasy', 'drafts'] }), client.refetchQueries({ queryKey: ['fantasy', 'summary'] })])
+    }
+    setTab(next)
+  }
   function newDraft() { setError(''); setEditing(emptyDraft(platforms[0]?.id ?? '')) }
   function editDraft(draft: Draft) { setError(''); setEditing({ ...draft, leagueId: null }) }
 
@@ -83,7 +91,7 @@ export function FantasyPage() {
     </div>
 
     <div className="mt-7 flex gap-1 overflow-x-auto rounded-xl border border-white/10 bg-white/[.03] p-1">
-      {([['tracker', 'Results & P&L'], ['assistant', 'Draft assistant'], ['sources', 'Sources'], ['aliases', 'Player aliases']] as const).map(([key, label]) => <button key={key} className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold ${tab === key ? 'bg-violet-500 text-white' : 'text-slate-400 hover:text-white'}`} onClick={() => setTab(key)}>{label}</button>)}
+      {([['tracker', 'Results & P&L'], ['assistant', 'Draft assistant'], ['sources', 'Sources'], ['aliases', 'Player aliases']] as const).map(([key, label]) => <button key={key} className={`whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold ${tab === key ? 'bg-violet-500 text-white' : 'text-slate-400 hover:text-white'}`} onClick={() => void selectTab(key)}>{label}</button>)}
     </div>
 
     {tab === 'tracker' && <>
