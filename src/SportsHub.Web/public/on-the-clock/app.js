@@ -36,7 +36,7 @@ function open(title,body,wide=false){const m=$('#modal');m.className=wide?'wide'
 function close(){$('#modal').close();}
 function positionNotice(a,r){const {source}=activeAdp(state,r);if(!source)return '';const covered=a.pool.filter(p=>p.positionSource===source.id).length,fallback=a.pool.length-covered;return `<p class="fineprint position-source-note">Positions: <b>${esc(source.name)}</b> · ${covered} of ${a.pool.length} board players use platform eligibility.${fallback?` ${fallback} use ranking / projection positions because the ADP position is missing or unmatched.`:''} Applies to your current roster too. W displays as F.</p>`;}
 function tagPositions(p){return p.pos.length?p.pos.map(g=>`<span class="position ${g}" title="${p.positionSource?'Platform position from selected ADP source':'Ranking / projection position'}">${g}</span>`).join(''):'<span class="muted">?</span>';}
-function draft(id){const a=analysis(state,room()),p=a.pool.find(p=>p.id===id);if(!p)return;if(!mutate(()=>recordPick(room(),p)))return;selected.delete(id);toast(`${p.name} → ${room().picks.at(-1)?.team===room().config.slot?'your roster':'Team '+room().picks.at(-1)?.team}`);render();}
+function draft(id){const a=analysis(state,room()),p=a.pool.find(p=>p.id===id);if(!p)return;if(!mutate(()=>recordPick(room(),p)))return;selected.delete(id);query='';page=1;toast(`${p.name} → ${room().picks.at(-1)?.team===room().config.slot?'your roster':'Team '+room().picks.at(-1)?.team}`);render();}
 function render(){
  const r=room(),a=analysis(state,r),isMine=!a.complete&&snakeTeam(a.pick,r.config.teams)===r.config.slot,rankSource=state.sources.find(s=>s.id===r.rankSource),demo=rankSource?.demo&&r.orderMode!=='consensus';
  const consensus=r.orderMode==='consensus';
