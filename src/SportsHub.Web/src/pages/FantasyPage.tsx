@@ -83,7 +83,7 @@ export function FantasyPage() {
       const script = document.createElement('script')
       script.id = 'on-the-clock-module'
       script.type = 'module'
-      script.src = '/on-the-clock/app.js'
+      script.src = '/on-the-clock/app.js?v=20261001-search-clear'
       document.head.append(script)
     }
   }, [])
