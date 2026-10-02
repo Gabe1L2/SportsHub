@@ -1,4 +1,4 @@
-import {sourceRoles,replaceSource,deleteBlockers,deleteSource} from './source-actions.js';
+import {sourceRoles,replaceSource,deleteBlockers,deleteSource,updateSourcePlayerPosition} from './source-actions.js?v=20261001-position-editor';
 import {STAT_KEYS,STAT_LABELS,projectionMapping,normalizeProjections,projectionDefaults,buildConsensus,nameMatches,activeAdp} from './projections.js';
 import {GUIDANCE_DEFAULTS} from './lookahead.js';
 import {projectionUI} from './projection-ui.js';
@@ -129,6 +129,7 @@ window.mountOnTheClock=render;
 window.refreshOnTheClockWorkspace=refreshWorkspace;
 window.flushOnTheClockWorkspace=flushWorkspace;
 window.renameOnTheClockSource=(id,name)=>mutate(()=>{const source=state.sources.find(source=>source.id===id),next=String(name||'').trim();if(!source)throw new Error('Source not found.');if(!next||next.length>120)throw new Error('Use a source name between 1 and 120 characters.');source.name=next;});
+window.updateOnTheClockSourcePlayerPosition=async(sourceId,playerId,position)=>{if(!mutate(()=>updateSourcePlayerPosition(state,sourceId,playerId,position)))return false;return flushWorkspace();};
 window.reconcileOnTheClockSource=(id,matches)=>mutate(()=>{const source=state.sources.find(source=>source.id===id);if(!source)throw new Error('Source not found.');const byName=new Map(matches.map(x=>[x.sourceName,x])),localToCanonical=new Map();for(const player of source.players){const match=byName.get(player.name);if(!match)continue;localToCanonical.set(player.id,match.playerId);player.canonicalPlayerId=match.playerId;player.canonicalName=match.canonicalName;player.canonicalMatchType=match.matchType;}for(const draftRoom of state.rooms)for(const pick of draftRoom.picks)if(pick.player&&localToCanonical.has(pick.player.id))pick.player.id=localToCanonical.get(pick.player.id);});
 window.mergeOnTheClockPlayers=mergeCanonicalPlayers;
 render();

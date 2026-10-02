@@ -1,4 +1,17 @@
 import {nameMatches,projectionDefaults} from './projections.js';
+import {positions} from './engine.js';
+
+export function updateSourcePlayerPosition(state,sourceId,playerId,value){
+ const source=state.sources.find(source=>source.id===sourceId);
+ if(!source)throw new Error('Source not found.');
+ const player=source.players.find(player=>player.id===playerId);
+ if(!player)throw new Error('Player not found in that source.');
+ const raw=String(value||'').trim(),pos=positions(raw);
+ if(raw&&!pos.length)throw new Error('Use G, F, C, or a supported combination.');
+ if(source.kind==='adp'&&pos.length>1)throw new Error('An ADP source requires one platform position: G, F, or C.');
+ player.pos=pos;player.posRaw=pos.join('/');
+ return player;
+}
 
 export function sourceRoles(room,id){
  const roles=[];

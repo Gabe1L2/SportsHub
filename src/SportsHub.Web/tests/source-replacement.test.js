@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ensureActiveRoom, poolFor } from '../public/on-the-clock/engine.js'
-import { replaceSource } from '../public/on-the-clock/source-actions.js'
+import { replaceSource, updateSourcePlayerPosition } from '../public/on-the-clock/source-actions.js'
 
 const player = (adp) => ({ id: 'jalenjohnson', name: 'Jalen Johnson', rank: null, adp, pos: ['F'], posRaw: 'F', team: 'ATL' })
 
@@ -33,5 +33,26 @@ describe('source replacement', () => {
 
     expect(room.adpSource).toBe(replacement.id)
     expect(poolFor(state, room)[0].adp).toBe(8.3)
+  })
+})
+
+describe('source position edits', () => {
+  it('updates and clears a player position in imported data', () => {
+    const source = { id: 'rankings', kind: 'ranking', platform: 'All', players: [{ ...player(20.2), pos: ['F'], posRaw: 'F' }] }
+    const state = { sources: [source] }
+
+    updateSourcePlayerPosition(state, source.id, 'jalenjohnson', 'G / C')
+    expect(source.players[0]).toMatchObject({ pos: ['G', 'C'], posRaw: 'G/C' })
+
+    updateSourcePlayerPosition(state, source.id, 'jalenjohnson', '')
+    expect(source.players[0]).toMatchObject({ pos: [], posRaw: '' })
+  })
+
+  it('rejects multiple positions for a platform ADP source', () => {
+    const source = { id: 'adp', kind: 'adp', platform: 'Underdog', players: [player(20.2)] }
+    const state = { sources: [source] }
+
+    expect(() => updateSourcePlayerPosition(state, source.id, 'jalenjohnson', 'F/C')).toThrow('one platform position')
+    expect(source.players[0]).toMatchObject({ pos: ['F'], posRaw: 'F' })
   })
 })
