@@ -1,5 +1,5 @@
-import {nameMatches,projectionDefaults} from './projections.js';
-import {positions} from './engine.js';
+import {nameMatches,projectionDefaults} from './projections.js?v=20261010-custom-drafts-fix1';
+import {positions} from './engine.js?v=20261010-custom-drafts-fix1';
 
 export function updateSourcePlayerPosition(state,sourceId,playerId,value){
  const source=state.sources.find(source=>source.id===sourceId);

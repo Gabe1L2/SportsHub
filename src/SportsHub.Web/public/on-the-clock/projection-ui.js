@@ -1,4 +1,4 @@
-import {STAT_KEYS,STAT_LABELS,scoringPreset,projectionDefaults,validateProjectionConfig,buildConsensus,nameMatches,norm} from './projections.js';
+import {STAT_KEYS,STAT_LABELS,scoringPreset,projectionDefaults,validateProjectionConfig,buildConsensus,nameMatches,norm} from './projections.js?v=20261010-custom-drafts-fix1';
 const $=s=>document.querySelector(s);
 const common=['PTS','REB','AST','STL','BLK','TO','FG3M','DD','TD'];
 export function projectionUI(ctx){

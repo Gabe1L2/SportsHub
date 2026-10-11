@@ -1,5 +1,5 @@
-import {lookAhead,GUIDANCE_DEFAULTS} from './lookahead.js';
-import {buildConsensus,STAT_KEYS,validateProjectionConfig,projectionDefaults,activeAdp,platformPosition} from './projections.js';
+import {lookAhead,GUIDANCE_DEFAULTS} from './lookahead.js?v=20261010-custom-drafts-fix1';
+import {buildConsensus,STAT_KEYS,validateProjectionConfig,projectionDefaults,activeAdp,platformPosition} from './projections.js?v=20261010-custom-drafts-fix1';
 export const GROUPS = ['G','F','C'];
 export const DRAFT_PLATFORMS = ['Underdog','DraftKings','Sleeper','Custom'];
 export const SOURCE_PLATFORMS = [...DRAFT_PLATFORMS,'All'];
