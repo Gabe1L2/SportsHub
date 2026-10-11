@@ -1,6 +1,8 @@
 import {lookAhead,GUIDANCE_DEFAULTS} from './lookahead.js';
 import {buildConsensus,STAT_KEYS,validateProjectionConfig,projectionDefaults,activeAdp,platformPosition} from './projections.js';
 export const GROUPS = ['G','F','C'];
+export const DRAFT_PLATFORMS = ['Underdog','DraftKings','Sleeper','Custom'];
+export const SOURCE_PLATFORMS = [...DRAFT_PLATFORMS,'All'];
 export const key = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
 export const clamp = (n,a,b) => Math.max(a,Math.min(b,n));
 export function positions(value) {
@@ -136,7 +138,7 @@ export function validateBackup(data) {
   const sourceIds=new Set();
   const canonicalId=id=>typeof id==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id);
   function validPlayer(p,sourceRow=false){return p&&typeof p.name==='string'&&typeof p.id==='string'&&(sourceRow?p.id===key(p.name):p.id===key(p.name)||canonicalId(p.id))&&(p.canonicalPlayerId===undefined||canonicalId(p.canonicalPlayerId))&&Array.isArray(p.pos)&&p.pos.every(g=>GROUPS.includes(g))&&(p.rank===null||Number.isFinite(p.rank)&&p.rank>0)&&(p.adp===null||Number.isFinite(p.adp)&&p.adp>0);}
-  for(const s of data.sources){if(typeof s.id!=='string'||!/^[a-zA-Z0-9_-]+$/.test(s.id)||sourceIds.has(s.id)||typeof s.name!=='string'||typeof s.raw!=='string'||s.archived!==undefined&&typeof s.archived!=='boolean'||!['ranking','adp','projection'].includes(s.kind)||!['Underdog','DraftKings','All'].includes(s.platform)||!Array.isArray(s.players)||s.players.some(p=>!validPlayer(p,true))||new Set(s.players.map(p=>p.id)).size!==s.players.length)throw new Error('Invalid source in backup.');sourceIds.add(s.id);}
+  for(const s of data.sources){if(typeof s.id!=='string'||!/^[a-zA-Z0-9_-]+$/.test(s.id)||sourceIds.has(s.id)||typeof s.name!=='string'||typeof s.raw!=='string'||s.archived!==undefined&&typeof s.archived!=='boolean'||!['ranking','adp','projection'].includes(s.kind)||!SOURCE_PLATFORMS.includes(s.platform)||!Array.isArray(s.players)||s.players.some(p=>!validPlayer(p,true))||new Set(s.players.map(p=>p.id)).size!==s.players.length)throw new Error('Invalid source in backup.');sourceIds.add(s.id);}
   const playerIds=new Set(data.sources.flatMap(s=>s.players.map(p=>p.id)));
   for(const s of data.sources)if(s.kind==='projection'){
     if(!['perGame','totals'].includes(s.basis)||s.players.some(p=>!p.stats||STAT_KEYS.some(k=>p.stats[k]!==null&&(!Number.isFinite(p.stats[k])||p.stats[k]<0))||p.gp!==null&&(!Number.isFinite(p.gp)||p.gp<0||p.gp>100)))throw new Error('Invalid projection stats in backup.');
@@ -152,7 +154,7 @@ export function validateBackup(data) {
   }
   validateAliases(data.aliases);
   if(data.draftDefaults!==undefined){
-    if(!data.draftDefaults||typeof data.draftDefaults!=='object'||Array.isArray(data.draftDefaults)||Object.keys(data.draftDefaults).some(platform=>!['Underdog','DraftKings'].includes(platform)))throw new Error('Invalid saved draft defaults.');
+    if(!data.draftDefaults||typeof data.draftDefaults!=='object'||Array.isArray(data.draftDefaults)||Object.keys(data.draftDefaults).some(platform=>!DRAFT_PLATFORMS.includes(platform)))throw new Error('Invalid saved draft defaults.');
     for(const [platform,setup] of Object.entries(data.draftDefaults)){
       if(!setup||typeof setup!=='object'||!setup.config?.targets||!setup.config?.weights||!['ranking','consensus'].includes(setup.orderMode))throw new Error(`Invalid ${platform} draft defaults.`);
       validateConfig(setup.config);validateAliases(setup.aliases);
@@ -162,7 +164,7 @@ export function validateBackup(data) {
   }
   const roomIds=new Set();
   for(const r of data.rooms){
-    if(!r||typeof r.id!=='string'||!/^[a-zA-Z0-9_-]+$/.test(r.id)||roomIds.has(r.id)||!['Underdog','DraftKings'].includes(r.platform)||typeof r.name!=='string'||r.archived!==undefined&&typeof r.archived!=='boolean'||!r.config?.targets||!r.config?.weights||!Array.isArray(r.picks)||!Array.isArray(r.redo)||!Array.isArray(r.watch)||r.watch.some(id=>typeof id!=='string'||!(/^[a-z0-9]+$/.test(id)||canonicalId(id))))throw new Error('Invalid draft room in backup.');
+    if(!r||typeof r.id!=='string'||!/^[a-zA-Z0-9_-]+$/.test(r.id)||roomIds.has(r.id)||!DRAFT_PLATFORMS.includes(r.platform)||typeof r.name!=='string'||r.archived!==undefined&&typeof r.archived!=='boolean'||!r.config?.targets||!r.config?.weights||!Array.isArray(r.picks)||!Array.isArray(r.redo)||!Array.isArray(r.watch)||r.watch.some(id=>typeof id!=='string'||!(/^[a-z0-9]+$/.test(id)||canonicalId(id))))throw new Error('Invalid draft room in backup.');
     validateConfig(r.config);validateAliases(r.aliases);roomIds.add(r.id);
     if(r.orderMode!==undefined&&!['ranking','consensus'].includes(r.orderMode))throw new Error('Invalid board mode.');
     if(r.projections)validateProjectionConfig(r.projections,data.sources);
@@ -195,18 +197,20 @@ export function rememberDraftDefaults(data,room) {
   data.draftDefaults[room.platform]={orderMode:room.orderMode||'ranking',projections:structuredClone(room.projections||projectionDefaults(room.platform)),rankSource:room.rankSource||null,adpSource:room.adpSource||null,aliases:structuredClone(room.aliases||{}),config:structuredClone(room.config)};
 }
 export function newRoomFromDefaults(data,platform,fallback=null) {
+  if(!DRAFT_PLATFORMS.includes(platform))throw new Error('Choose a supported draft site.');
   const setup=data.draftDefaults?.[platform]||(fallback?.platform===platform?fallback:[...data.rooms].reverse().find(room=>room.platform===platform));
   const supportsPlatform=source=>source.platform==='All'||source.platform===platform;
   const activeRankings=data.sources.filter(source=>source.kind==='ranking'&&!source.archived&&supportsPlatform(source));
-  const activeAdp=data.sources.filter(source=>source.kind==='adp'&&!source.archived&&supportsPlatform(source));
+  const allActiveAdp=data.sources.filter(source=>source.kind==='adp'&&!source.archived),activeAdp=allActiveAdp.filter(supportsPlatform);
   const savedRank=activeRankings.find(source=>source.id===setup?.rankSource);
   const rankSource=(savedRank&&!savedRank.demo?savedRank:activeRankings.find(source=>!source.demo)||savedRank||activeRankings[0])?.id||null;
-  const adpSource=activeAdp.find(source=>source.id===setup?.adpSource)?.id||activeAdp[0]?.id||null;
+  const adpSource=allActiveAdp.find(source=>source.id===setup?.adpSource)?.id||activeAdp[0]?.id||allActiveAdp[0]?.id||null;
   const next=newRoom(platform,rankSource,adpSource);
   if(setup){next.config=structuredClone(setup.config);next.aliases=structuredClone(setup.aliases||{});next.projections=structuredClone(setup.projections||projectionDefaults(platform));next.orderMode=setup.orderMode||'ranking';}
   return next;
 }
 export function newRoom(platform,rankSource=null,adpSource=null) {
+  if(!DRAFT_PLATFORMS.includes(platform))throw new Error('Choose a supported draft site.');
   return {id:crypto.randomUUID(),platform,name:`${platform} draft`,orderMode:'ranking',projections:projectionDefaults(platform),rankSource,adpSource,picks:[],redo:[],watch:[],config:{guidance:{...GUIDANCE_DEFAULTS},teams:12,slot:2,rounds:16,targets:{G:5,F:5,C:3},weights:{rank:65,adp:20,need:15}}};
 }
 export function initialState() {

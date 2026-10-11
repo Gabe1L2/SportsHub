@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildConsensus, projectionDefaults } from '../public/on-the-clock/projections.js'
+import { buildConsensus, projectionDefaults, scoringPreset } from '../public/on-the-clock/projections.js'
 
 const player = (id, canonicalPlayerId, points) => ({
   id,
@@ -31,5 +31,14 @@ describe('projection source identity', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0].sourceCount).toBe(3)
     expect(rows[0].contributions.map(x => x.id)).toEqual(['hashtag', 'sportsline', 'espn'])
+  })
+})
+
+describe('scoring presets', () => {
+  it('keeps platform presets separate from the neutral custom baseline', () => {
+    expect(scoringPreset('Underdog')).toMatchObject({ PTS: 1, REB: 1.2, STL: 3, TO: -1, FG3M: 0 })
+    expect(scoringPreset('DraftKings')).toMatchObject({ PTS: 1, REB: 1.25, STL: 2, TO: -.5, FG3M: .5, DD: 1.5 })
+    expect(scoringPreset('Sleeper')).toMatchObject({ PTS: 1, REB: 0, AST: 0, TO: 0 })
+    expect(scoringPreset('Custom')).toEqual(scoringPreset('Sleeper'))
   })
 })

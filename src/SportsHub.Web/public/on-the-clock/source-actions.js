@@ -41,7 +41,7 @@ export function replaceSource(state,room,oldId,source){
    target.projections.weights[oldId]=0;
    if(target.projections.gpSource===oldId)target.projections.gpSource=source.id;
   }else if(source.kind==='ranking')target.rankSource=source.id;
-  else if(wasSelected||source.platform===target.platform||source.platform==='All')target.adpSource=source.id;
+  else target.adpSource=source.id;
  }
  for(const setup of Object.values(state.draftDefaults||{})){
   if(source.kind==='projection'&&((setup.projections?.weights?.[oldId]||0)>0||setup.projections?.gpSource===oldId)){

@@ -5,6 +5,14 @@ import { replaceSource, updateSourcePlayerPosition } from '../public/on-the-cloc
 const player = (adp) => ({ id: 'jalenjohnson', name: 'Jalen Johnson', rank: null, adp, pos: ['F'], posRaw: 'F', team: 'ATL' })
 
 describe('source replacement', () => {
+  it('lets a draft use an ADP source from a different site', () => {
+    const ranking = { id: 'rankings', kind: 'ranking', platform: 'All', raw: '', players: [{ ...player(20.2), rank: 10 }] }
+    const sleeperAdp = { id: 'sleeper-adp', kind: 'adp', platform: 'Sleeper', raw: '', players: [player(8.3)] }
+    const room = { platform: 'Custom', rankSource: ranking.id, adpSource: sleeperAdp.id, aliases: {}, orderMode: 'ranking' }
+
+    expect(poolFor({ sources: [ranking, sleeperAdp] }, room)[0].adp).toBe(8.3)
+  })
+
   it('activates a replacement ADP in every draft that used the prior version', () => {
     const ranking = { id: 'rankings', kind: 'ranking', platform: 'All', raw: '', players: [{ ...player(20.2), rank: 10 }] }
     const oldAdp = { id: 'old-adp', kind: 'adp', platform: 'Underdog', raw: '', players: [player(20.2)] }

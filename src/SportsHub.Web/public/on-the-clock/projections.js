@@ -4,7 +4,7 @@ export const STAT_KEYS=Object.keys(STAT_LABELS);
 export const norm=s=>String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]/g,'');
 const keys={gp:['gp','g','games','gamesplayed','projectedgames'],PTS:['pts','ppg','points'],REB:['reb','rpg','treb','trb','rebounds'],AST:['ast','apg','assists'],STL:['stl','spg','steals'],BLK:['blk','bpg','blocks'],TO:['to','tov','topg','turnovers'],FG3M:['3pm','3ptm','3pt','3p','3pts','3fgm','fg3m','threes'],FGM:['fgm','fg'],FGA:['fga'],FTM:['ftm','ft'],FTA:['fta'],FG3A:['3pa','3pta','fg3a'],OREB:['oreb','orb'],DREB:['dreb','drb'],FGMI:['fgmi','fgmissed'],FTMI:['ftmi','ftmissed'],DD:['dd','dd2','doubledoubles'],TD:['td','td3','tripledoubles'],MIN:['min','mpg','mp','minutes'],PF:['pf','fouls'],fgpair:['fgm/fga','fg%','fgpct'],ftpair:['ftm/fta','ft%','ftpct'],threepair:['3pm/3pa','3ptm/3pta','3p%','3pt%']};
 export function projectionMapping(headers){return Object.fromEntries(Object.entries(keys).map(([field,aliases])=>[field,headers.findIndex(h=>(field.endsWith('pair')||!/[/%]/.test(h))&&aliases.map(norm).includes(norm(h)))]));}
-export function scoringPreset(platform){const scoring=Object.fromEntries(STAT_KEYS.map(k=>[k,0]));Object.assign(scoring,platform==='DraftKings'?{PTS:1,REB:1.25,AST:1.5,STL:2,BLK:2,TO:-.5,FG3M:.5,DD:1.5,TD:3}:{PTS:1,REB:1.2,AST:1.5,STL:3,BLK:3,TO:-1});return scoring;}
+export function scoringPreset(preset){const scoring=Object.fromEntries(STAT_KEYS.map(k=>[k,0]));Object.assign(scoring,preset==='DraftKings'?{PTS:1,REB:1.25,AST:1.5,STL:2,BLK:2,TO:-.5,FG3M:.5,DD:1.5,TD:3}:preset==='Underdog'?{PTS:1,REB:1.2,AST:1.5,STL:3,BLK:3,TO:-1}:{PTS:1});return scoring;}
 export function projectionDefaults(platform){return {weights:{},scoring:scoringPreset(platform),gpPenalty:20,games:82,gpSource:'blend',ignoreMissingBonuses:true};}
 const parseNumber=value=>{const s=String(value??'').trim();return !s||/^(—|–|-|n\/?a|null)$/i.test(s)?null:Number(s.replace(/,/g,''));};
 export function normalizeProjections(table,mapping,basis='perGame'){
@@ -58,7 +58,7 @@ export function canonicalId(state,source,player,room){
  return player.canonicalPlayerId||player.id;
 }
 export function activeAdp(state,room){
- const source=state.sources.find(s=>s.id===room.adpSource&&s.kind==='adp'&&(s.platform===room.platform||s.platform==='All'));
+ const source=state.sources.find(s=>s.id===room.adpSource&&s.kind==='adp');
  return {source,byPlayer:new Map((source?.players||[]).map(p=>[canonicalId(state,source,p,room),p]))};
 }
 export function platformPosition(player,adp,source){
