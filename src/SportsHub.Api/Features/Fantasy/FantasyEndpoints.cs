@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.EntityFrameworkCore;
 using SportsHub.Api.Infrastructure;
+using SportsHub.Domain.Betting;
 using SportsHub.Domain.Fantasy;
 using SportsHub.Domain.Sports;
 using SportsHub.Infrastructure.Persistence;
@@ -73,8 +74,16 @@ public static class FantasyEndpoints
 
     private static async Task<IResult> GetDraftsAsync(ClaimsPrincipal principal, SportsHubDbContext db, bool archived = false, CancellationToken cancellationToken = default)
     {
+        var userId = UserId(principal);
+        var workspaceJson = await db.FantasyWorkspaces.AsNoTracking().Where(x => x.UserId == userId).Select(x => x.StateJson).SingleOrDefaultAsync(cancellationToken);
+        if (workspaceJson is not null)
+        {
+            using var workspace = JsonDocument.Parse(workspaceJson);
+            await SyncWorkspaceRoomsAsync(workspace.RootElement, userId, db, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
+        }
         var drafts = await db.Drafts.AsNoTracking().Include(x => x.Platform).Include(x => x.League)
-            .Where(x => x.UserId == UserId(principal) && x.IsArchived == archived)
+            .Where(x => x.UserId == userId && x.IsArchived == archived)
             .OrderByDescending(x => x.StartedAtUtc ?? x.ScheduledAtUtc ?? x.CreatedAtUtc).ToListAsync(cancellationToken);
         return Results.Ok(drafts.Select(ToResponse));
     }
@@ -465,13 +474,20 @@ public static class FantasyEndpoints
     private static async Task SyncWorkspaceRoomsAsync(JsonElement state, string userId, SportsHubDbContext db, CancellationToken cancellationToken)
     {
         if (!state.TryGetProperty("rooms", out var rooms) || rooms.ValueKind != JsonValueKind.Array) return;
-        var platforms = await db.BettingPlatforms.Where(x => x.IsActive).ToDictionaryAsync(x => x.Name.ToLower(), cancellationToken);
+        var platforms = (await db.BettingPlatforms.ToListAsync(cancellationToken)).ToDictionary(x => x.Name.ToLowerInvariant());
         var tracked = await db.Drafts.Where(x => x.UserId == userId && x.WorkspaceRoomId != null).ToDictionaryAsync(x => x.WorkspaceRoomId!, cancellationToken);
         foreach (var room in rooms.EnumerateArray())
         {
             if (!room.TryGetProperty("id", out var idValue) || !room.TryGetProperty("platform", out var platformValue)) continue;
-            var roomId = idValue.GetString(); var platformName = platformValue.GetString();
-            if (string.IsNullOrWhiteSpace(roomId) || roomId.Length > 100 || string.IsNullOrWhiteSpace(platformName) || !platforms.TryGetValue(platformName.ToLower(), out var platform)) continue;
+            var roomId = idValue.GetString(); var platformName = platformValue.GetString()?.Trim();
+            if (string.IsNullOrWhiteSpace(roomId) || roomId.Length > 100 || string.IsNullOrWhiteSpace(platformName)) continue;
+            var platformKey = platformName.ToLowerInvariant();
+            if (!platforms.TryGetValue(platformKey, out var platform))
+            {
+                platformName = platformName[..Math.Min(platformName.Length, 120)];
+                platform = new BettingPlatform { Name = platformName, Type = BettingPlatformType.Other, IsActive = true };
+                db.BettingPlatforms.Add(platform); platforms[platformKey] = platform;
+            }
             var name = room.TryGetProperty("name", out var nameValue) ? nameValue.GetString() : null;
             var config = room.TryGetProperty("config", out var configValue) ? configValue : default;
             var teams = ReadInt(config, "teams") is { } teamValue ? Math.Clamp(teamValue, 2, 30) : 12;

@@ -35,8 +35,8 @@ export function FantasyPage() {
   const [draftFiltersOpen, setDraftFiltersOpen] = useState(false)
   const [draftViewMode, setDraftViewMode] = useState<DraftViewMode>(() => localStorage.getItem('fantasy-draft-view-mode') === 'compact' ? 'compact' : 'comfortable')
   const client = useQueryClient()
-  const summary = useQuery({ queryKey: ['fantasy', 'summary'], queryFn: () => api<Summary>('/api/fantasy/summary') })
   const drafts = useQuery({ queryKey: ['fantasy', 'drafts'], queryFn: () => api<Draft[]>('/api/fantasy/drafts') })
+  const summary = useQuery({ queryKey: ['fantasy', 'summary'], queryFn: () => api<Summary>('/api/fantasy/summary'), enabled: drafts.isSuccess })
   const lookups = useQuery({ queryKey: ['betting', 'lookups'], queryFn: () => api<BettingLookups>('/api/betting/lookups') })
   const save = useMutation({
     mutationFn: (draft: DraftInput & { id?: string }) => api<Draft>(draft.id ? `/api/fantasy/drafts/${draft.id}` : '/api/fantasy/drafts', { method: draft.id ? 'PUT' : 'POST', body: JSON.stringify(toRequest(draft)) }),
