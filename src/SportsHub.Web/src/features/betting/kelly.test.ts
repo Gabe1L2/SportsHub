@@ -18,11 +18,12 @@ describe('Kelly calculator', () => {
   })
 
   it('builds independent flex outcome probabilities and optimizes across every payout', () => {
-    const result = calculateFlexKelly(2, 0.6, 10, [
+    const result = calculateFlexKelly(2, 0.36, 10, [
       { requiredCorrectLegs: 1, finalPayoutAmount: 10 },
       { requiredCorrectLegs: 2, finalPayoutAmount: 30 },
     ], 1_000, 0.5)
 
+    expect(result?.perLegProbability).toBeCloseTo(0.6, 10)
     expect(result?.outcomes.map(outcome => outcome.probability)).toEqual([
       expect.closeTo(0.16, 10),
       expect.closeTo(0.48, 10),
@@ -33,7 +34,7 @@ describe('Kelly calculator', () => {
   })
 
   it('treats unlisted flex results as a full loss and returns zero for negative value', () => {
-    const result = calculateFlexKelly(3, 0.4, 10, [
+    const result = calculateFlexKelly(3, 0.064, 10, [
       { requiredCorrectLegs: 3, finalPayoutAmount: 20 },
     ], 500, 0.25)
 

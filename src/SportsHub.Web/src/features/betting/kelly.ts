@@ -9,6 +9,7 @@ export type KellyCalculation = {
   adjustedKellyFraction: number
   suggestedWager: number
   outcomes: KellyOutcome[]
+  perLegProbability?: number
 }
 
 export type KellyPayoutTier = {
@@ -80,9 +81,11 @@ export function calculateAllOrNothingKelly(winProbability: number, decimalOdds: 
   return finishCalculation(outcomes, bankroll, multiplier)
 }
 
-export function calculateFlexKelly(legCount: number, perLegProbability: number, entryValue: number, tiers: KellyPayoutTier[], bankroll: number, multiplier: number) {
-  if (!Number.isInteger(legCount) || legCount < 1 || !Number.isFinite(perLegProbability) || perLegProbability < 0 || perLegProbability > 1 || !Number.isFinite(entryValue) || entryValue <= 0)
+export function calculateFlexKelly(legCount: number, allLegsProbability: number, entryValue: number, tiers: KellyPayoutTier[], bankroll: number, multiplier: number) {
+  if (!Number.isInteger(legCount) || legCount < 1 || !Number.isFinite(allLegsProbability) || allLegsProbability < 0 || allLegsProbability > 1 || !Number.isFinite(entryValue) || entryValue <= 0)
     return null
+
+  const perLegProbability = allLegsProbability ** (1 / legCount)
 
   const payoutByCorrectLegs = new Map<number, number>()
   for (const tier of tiers) {
@@ -97,5 +100,5 @@ export function calculateFlexKelly(legCount: number, perLegProbability: number, 
     probability: binomialProbability(legCount, correctLegs, perLegProbability),
     payoutMultiple: (payoutByCorrectLegs.get(correctLegs) ?? 0) / entryValue,
   }))
-  return finishCalculation(outcomes, bankroll, multiplier)
+  return { ...finishCalculation(outcomes, bankroll, multiplier), perLegProbability }
 }
