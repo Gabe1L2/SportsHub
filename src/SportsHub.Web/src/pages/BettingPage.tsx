@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { api } from '../lib/api'
+import { api, type CurrentUser } from '../lib/api'
 import { useAuth } from '../auth/AuthProvider'
 import { BetForm } from '../features/betting/BetForm'
 import { BetCsvImporter } from '../features/betting/BetCsvImporter'
@@ -50,6 +50,7 @@ export function BettingPage() {
   const lookups = useQuery({ queryKey: ['betting', 'lookups'], queryFn: () => api<BettingLookups>('/api/betting/lookups') })
   const refresh = () => client.invalidateQueries({ queryKey: ['betting'] })
   const saveBet = useMutation({ mutationFn: ({ bet, input }: { bet?: Bet | null; input: BetInput }) => api<Bet>(bet ? `/api/betting/bets/${bet.id}` : '/api/betting/bets', { method: bet ? 'PUT' : 'POST', body: JSON.stringify(input) }), onSuccess: () => { setFormBet(undefined); void refresh() } })
+  const saveKellyMultiplier = useMutation({ mutationFn: (kellyMultiplier: number) => api<CurrentUser>('/api/account/preferences/kelly', { method: 'PUT', body: JSON.stringify({ kellyMultiplier }) }), onSuccess: updatedUser => client.setQueryData(['account', 'me'], updatedUser) })
   const settleBet = useMutation({ mutationFn: ({ bet, input }: { bet: Bet; input: unknown }) => api(`/api/betting/bets/${bet.id}/settle`, { method: 'POST', body: JSON.stringify(input) }), onSuccess: () => { setSettling(null); void refresh() } })
   const archiveBet = useMutation({ mutationFn: ({ bet, restore }: { bet: Bet; restore: boolean }) => api<void>(`/api/betting/bets/${bet.id}/${restore ? 'restore' : 'archive'}`, { method: 'POST' }), onSuccess: () => void refresh() })
 
@@ -109,7 +110,7 @@ export function BettingPage() {
 
     {(bets.data?.totalCount ?? 0) > pageSize && <div className="mt-5 flex items-center justify-between text-sm text-slate-400"><span>Page {filters.page} of {totalPages}</span><div className="flex gap-2"><button className={secondaryButton} disabled={filters.page <= 1} onClick={() => setFilter('page', filters.page - 1)}>Previous</button><button className={secondaryButton} disabled={filters.page >= totalPages} onClick={() => setFilter('page', filters.page + 1)}>Next</button></div></div>}
 
-    {formBet !== undefined && lookups.data && <BetForm bet={formBet} lookups={lookups.data} saving={saveBet.isPending} onClose={() => setFormBet(undefined)} onSave={input => saveBet.mutateAsync({ bet: formBet, input }).then(() => undefined)} />}
+    {formBet !== undefined && lookups.data && <BetForm bet={formBet} lookups={lookups.data} currentBankroll={financeSummary.data?.currentBankroll ?? null} kellyMultiplier={user?.kellyMultiplier ?? 0.25} saving={saveBet.isPending} savingKellyMultiplier={saveKellyMultiplier.isPending} onClose={() => setFormBet(undefined)} onSave={input => saveBet.mutateAsync({ bet: formBet, input }).then(() => undefined)} onKellyMultiplierChange={value => saveKellyMultiplier.mutateAsync(value).then(() => undefined)} />}
     {settling && <SettleDialog bet={settling} saving={settleBet.isPending} onClose={() => setSettling(null)} onSave={input => settleBet.mutateAsync({ bet: settling, input }).then(() => undefined)} />}
     {managing && lookups.data && <LookupManager lookups={lookups.data} canManagePlatforms={canManagePlatforms} onClose={() => setManaging(false)} />}
     {importing && canManagePlatforms && <BetCsvImporter onClose={() => setImporting(false)} />}

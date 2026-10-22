@@ -1,9 +1,20 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import type { Bet, BetInput, BettingLookups, BetPayoutMode, BetTiming, BonusType, PayoutTierInput } from './types'
 import { americanToDecimal, decimalToAmerican, displayEnum, money } from './types'
+import { calculateAllOrNothingKelly, calculateFlexKelly } from './kelly'
 import { Field, inputClass, Modal, primaryButton, secondaryButton } from './ui'
 
-type Props = { bet?: Bet | null; lookups: BettingLookups; saving: boolean; onClose: () => void; onSave: (input: BetInput) => Promise<void> }
+type Props = {
+  bet?: Bet | null
+  lookups: BettingLookups
+  currentBankroll: number | null
+  kellyMultiplier: number
+  saving: boolean
+  savingKellyMultiplier: boolean
+  onClose: () => void
+  onSave: (input: BetInput) => Promise<void>
+  onKellyMultiplierChange: (value: number) => Promise<void>
+}
 type OddsMode = 'american' | 'decimal' | 'payout'
 type TierDraft = { requiredCorrectLegs: string; basePayoutAmount: string; finalPayoutAmount: string }
 
@@ -13,8 +24,9 @@ const localDateTime = (value?: string) => {
   return local.toISOString().slice(0, 16)
 }
 const numberOrNull = (value: string) => value.trim() === '' ? null : Number(value)
+const probabilityText = (value: number) => value > 0 && value < 0.001 ? '<0.1%' : `${(value * 100).toFixed(1)}%`
 
-export function BetForm({ bet, lookups, saving, onClose, onSave }: Props) {
+export function BetForm({ bet, lookups, currentBankroll, kellyMultiplier, saving, savingKellyMultiplier, onClose, onSave, onKellyMultiplierChange }: Props) {
   const originalFullTier = bet?.payoutTiers.find(x => x.requiredCorrectLegs === bet.legCount)
   const [platformId, setPlatformId] = useState(bet?.platform.id ?? lookups.platforms.find(x => x.isActive)?.id ?? '')
   const [sourceId, setSourceId] = useState(bet?.source?.id ?? '')
@@ -36,6 +48,8 @@ export function BetForm({ bet, lookups, saving, onClose, onSave }: Props) {
   const [bonusAmount, setBonusAmount] = useState(bet?.bonus?.fixedAmount == null ? '' : String(bet.bonus.fixedAmount))
   const [bonusDescription, setBonusDescription] = useState(bet?.bonus?.description ?? '')
   const [tiers, setTiers] = useState<TierDraft[]>(() => bet?.payoutTiers.map(x => ({ requiredCorrectLegs: String(x.requiredCorrectLegs), basePayoutAmount: String(x.basePayoutAmount), finalPayoutAmount: String(x.finalPayoutAmount) })) ?? [])
+  const [multiplier, setMultiplier] = useState(String(kellyMultiplier))
+  const [multiplierMessage, setMultiplierMessage] = useState('')
   const [error, setError] = useState('')
 
   const entryValueNumber = Number(entryValue) || 0
@@ -46,6 +60,23 @@ export function BetForm({ bet, lookups, saving, onClose, onSave }: Props) {
     const decimal = oddsMode === 'american' ? americanToDecimal(value) : value
     return decimal > 0 ? { decimal, payout: decimal * entryValueNumber } : { decimal: null, payout: null }
   }, [entryValueNumber, oddsMode, pricingValue])
+
+  const kelly = useMemo(() => {
+    if (probability === '') return null
+    const winProbability = Number(probability) / 100
+    const multiplierNumber = Number(multiplier)
+    if (!Number.isFinite(multiplierNumber) || multiplierNumber < 0 || multiplierNumber > 1) return null
+    if (payoutMode === 'AllOrNothing') {
+      if (pricing.decimal == null) return null
+      return calculateAllOrNothingKelly(winProbability, pricing.decimal, currentBankroll ?? 0, multiplierNumber)
+    }
+    if (tiers.length === 0 || tiers.some(tier => tier.requiredCorrectLegs.trim() === '' || tier.finalPayoutAmount.trim() === '')) return null
+    if (!tiers.some(tier => Number(tier.requiredCorrectLegs) === Number(legCount))) return null
+    return calculateFlexKelly(Number(legCount), winProbability, entryValueNumber, tiers.map(tier => ({
+      requiredCorrectLegs: Number(tier.requiredCorrectLegs),
+      finalPayoutAmount: Number(tier.finalPayoutAmount),
+    })), currentBankroll ?? 0, multiplierNumber)
+  }, [currentBankroll, entryValueNumber, legCount, multiplier, payoutMode, pricing.decimal, probability, tiers])
 
   function changeLegCount(value: string) {
     setLegCount(value)
@@ -61,6 +92,22 @@ export function BetForm({ bet, lookups, saving, onClose, onSave }: Props) {
 
   function updateTier(index: number, key: keyof TierDraft, value: string) {
     setTiers(current => current.map((tier, tierIndex) => tierIndex === index ? { ...tier, [key]: value } : tier))
+  }
+
+  async function saveMultiplier() {
+    const value = Number(multiplier)
+    if (!Number.isFinite(value) || value < 0 || value > 1) {
+      setMultiplierMessage('Enter a multiplier from 0 to 1.')
+      return
+    }
+    setMultiplierMessage('')
+    try {
+      await onKellyMultiplierChange(value)
+      setMultiplier(String(value))
+      setMultiplierMessage('Saved to your account.')
+    } catch (reason) {
+      setMultiplierMessage(reason instanceof Error ? reason.message : 'Unable to save the multiplier.')
+    }
   }
 
   async function submit(event: FormEvent) {
@@ -113,7 +160,7 @@ export function BetForm({ bet, lookups, saving, onClose, onSave }: Props) {
             <Field label="Bet timing"><div className="mt-1.5 grid grid-cols-2 rounded-xl border border-white/15 bg-slate-950/70 p-1">{(['Pregame', 'Live'] as BetTiming[]).map(value => <button key={value} type="button" onClick={() => setTiming(value)} className={`rounded-lg px-3 py-2 text-sm font-semibold ${timing === value ? 'bg-emerald-400 text-emerald-950' : 'text-slate-400'}`}>{value}</button>)}</div></Field>
             <Field label="Currency"><input maxLength={3} className={inputClass} value={currencyCode} onChange={e => setCurrencyCode(e.target.value)} /></Field>
           </div>
-          <Field label="Your estimated hit probability" hint="Optional. Enter a percentage such as 42.5."><div className="relative"><input min="0" max="100" step="0.01" type="number" className={`${inputClass} pr-9`} value={probability} onChange={e => setProbability(e.target.value)} /><span className="absolute right-3 top-4 text-sm text-slate-500">%</span></div></Field>
+          <Field label={payoutMode === 'Flex' ? 'Estimated hit probability per leg' : 'Your estimated bet win probability'} hint={payoutMode === 'Flex' ? 'Applied equally to each independent leg.' : 'Optional. Enter a percentage such as 42.5.'}><div className="relative"><input min="0" max="100" step="0.01" type="number" className={`${inputClass} pr-9`} value={probability} onChange={e => setProbability(e.target.value)} /><span className="absolute right-3 top-4 text-sm text-slate-500">%</span></div></Field>
           <Field label="Notes"><textarea rows={3} maxLength={2000} className={inputClass} placeholder="What made this bet interesting?" value={notes} onChange={e => setNotes(e.target.value)} /></Field>
         </section>
 
@@ -131,6 +178,23 @@ export function BetForm({ bet, lookups, saving, onClose, onSave }: Props) {
             <button type="button" className={secondaryButton} onClick={() => setTiers(current => [...current, { requiredCorrectLegs: legCount, basePayoutAmount: '', finalPayoutAmount: '' }])}>+ Add payout tier</button>
             <p className="text-xs text-slate-500">Enter the total returned at each result. Base payout is optional unless you want to preserve the pre-bonus amount.</p>
           </div>}
+
+          <div className="rounded-2xl border border-emerald-400/20 bg-emerald-400/[.06] p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div><h3 className="font-bold text-emerald-200">Kelly stake calculator</h3><p className="mt-1 text-xs text-slate-400">{currentBankroll == null ? 'Current bankroll is unavailable.' : `Uses your ${money(currentBankroll)} current bankroll.`}</p></div>
+              <div className="text-right"><span className="block text-[10px] font-bold uppercase tracking-wider text-emerald-200/60">Suggested wager</span><strong className="text-2xl text-emerald-300">{kelly ? kelly.suggestedWager <= 0 ? 'Bet $0' : `Bet ${money(kelly.suggestedWager, currencyCode)}` : '—'}</strong></div>
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-[1.4fr_1fr]">
+              <Field label="Kelly multiplier" hint="0.25 is quarter Kelly; saved to your account.">
+                <div className="flex gap-2"><div className="relative min-w-0 flex-1"><input min="0" max="1" step="0.05" type="number" className={`${inputClass} pr-8`} value={multiplier} onChange={e => { setMultiplier(e.target.value); setMultiplierMessage('') }} /><span className="absolute right-3 top-4 text-sm text-slate-500">×</span></div><button type="button" disabled={savingKellyMultiplier} className={`${secondaryButton} mt-1.5 shrink-0`} onClick={() => void saveMultiplier()}>{savingKellyMultiplier ? 'Saving…' : 'Save'}</button></div>
+                {multiplierMessage && <span className={`mt-1 block text-xs ${multiplierMessage.startsWith('Saved') ? 'text-emerald-300' : 'text-rose-300'}`}>{multiplierMessage}</span>}
+              </Field>
+              <div className="rounded-xl bg-slate-950/40 p-3"><span className="block text-[10px] font-bold uppercase tracking-wider text-slate-500">Full Kelly fraction</span><strong className="mt-1 block text-lg">{kelly ? `${(kelly.fullKellyFraction * 100).toFixed(2)}%` : '—'}</strong><span className="text-xs text-slate-500">After multiplier: {kelly ? `${(kelly.adjustedKellyFraction * 100).toFixed(2)}%` : '—'}</span></div>
+            </div>
+            {!kelly && <p className="mt-3 text-xs text-slate-400">Enter a valid probability and complete the payout details to see a recommendation.</p>}
+            {kelly && kelly.fullKellyFraction <= 0 && <p className="mt-3 rounded-lg bg-amber-400/10 px-3 py-2 text-xs text-amber-200">These inputs do not show a profitable edge. Bet $0.</p>}
+            {kelly && payoutMode === 'Flex' && <div className="mt-3"><span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Independent outcome chances</span><div className="mt-2 flex max-h-28 flex-wrap gap-1.5 overflow-auto">{kelly.outcomes.map(outcome => <span key={outcome.correctLegs} className={`rounded-md px-2 py-1 text-[11px] ${outcome.payoutMultiple > 0 ? 'bg-emerald-400/10 text-emerald-200' : 'bg-white/5 text-slate-500'}`}>{outcome.correctLegs}/{legCount}: {probabilityText(outcome.probability)}</span>)}</div></div>}
+          </div>
 
           <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-white/10 bg-white/[.025] p-4"><span><strong className="block text-sm">Bonus applied</strong><span className="text-xs text-slate-500">Payout boost, free entry, discount pick, or protection</span></span><input type="checkbox" className="size-5 accent-emerald-400" checked={hasBonus} onChange={e => setHasBonus(e.target.checked)} /></label>
           {hasBonus && <div className="grid gap-4 rounded-2xl border border-emerald-400/15 bg-emerald-400/5 p-4 sm:grid-cols-2">

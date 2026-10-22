@@ -943,6 +943,12 @@ namespace SportsHub.Infrastructure.Persistence.Migrations
                     b.Property<bool>("EmailConfirmed")
                         .HasColumnType("bit");
 
+                    b.Property<decimal>("KellyMultiplier")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(5, 4)
+                        .HasColumnType("decimal(5,4)")
+                        .HasDefaultValue(0.25m);
+
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("bit");
 

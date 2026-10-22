@@ -8,7 +8,8 @@ using SportsHub.Infrastructure.Identity;
 namespace SportsHub.Api.Features.Account;
 
 public sealed record LoginRequest([property: Required, EmailAddress] string Email, [property: Required] string Password, bool RememberMe = false);
-public sealed record UserResponse(string Id, string Email, IReadOnlyList<string> Roles);
+public sealed record KellyPreferencesRequest(decimal KellyMultiplier);
+public sealed record UserResponse(string Id, string Email, IReadOnlyList<string> Roles, decimal KellyMultiplier);
 
 public static class AccountEndpoints
 {
@@ -23,6 +24,7 @@ public static class AccountEndpoints
         group.MapPost("/login", LoginAsync).AllowAnonymous().ValidateAntiforgery();
         group.MapPost("/logout", LogoutAsync).RequireAuthorization().ValidateAntiforgery();
         group.MapGet("/me", CurrentUserAsync).RequireAuthorization();
+        group.MapPut("/preferences/kelly", UpdateKellyPreferencesAsync).RequireAuthorization().ValidateAntiforgery();
         return endpoints;
     }
 
@@ -49,6 +51,19 @@ public static class AccountEndpoints
         return user is null ? Results.Unauthorized() : Results.Ok(await ToResponseAsync(user, users));
     }
 
+    private static async Task<IResult> UpdateKellyPreferencesAsync(KellyPreferencesRequest request, HttpContext context, UserManager<ApplicationUser> users)
+    {
+        if (request.KellyMultiplier is < 0m or > 1m)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["kellyMultiplier"] = ["Kelly multiplier must be between 0 and 1."] });
+        var user = await users.GetUserAsync(context.User);
+        if (user is null) return Results.Unauthorized();
+        user.KellyMultiplier = decimal.Round(request.KellyMultiplier, 4, MidpointRounding.AwayFromZero);
+        var result = await users.UpdateAsync(user);
+        if (!result.Succeeded)
+            return Results.ValidationProblem(result.Errors.GroupBy(x => x.Code).ToDictionary(x => x.Key, x => x.Select(error => error.Description).ToArray()));
+        return Results.Ok(await ToResponseAsync(user, users));
+    }
+
     private static async Task<UserResponse> ToResponseAsync(ApplicationUser user, UserManager<ApplicationUser> users) =>
-        new(user.Id, user.Email!, (await users.GetRolesAsync(user)).ToArray());
+        new(user.Id, user.Email!, (await users.GetRolesAsync(user)).ToArray(), user.KellyMultiplier);
 }

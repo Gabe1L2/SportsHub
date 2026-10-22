@@ -36,6 +36,7 @@ public sealed class SportsHubDbContext(DbContextOptions<SportsHubDbContext> opti
     {
         base.OnModelCreating(builder);
         builder.Entity<DataProtectionKey>().ToTable("DataProtectionKeys", "security");
+        builder.Entity<ApplicationUser>(e => e.Property(x => x.KellyMultiplier).HasPrecision(5, 4).HasDefaultValue(0.25m));
         ConfigureSports(builder);
         ConfigureFantasy(builder);
         ConfigureBetting(builder);
