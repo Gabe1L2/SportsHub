@@ -17,7 +17,35 @@ export type KellyPayoutTier = {
   finalPayoutAmount: number
 }
 
+export type ParsedProbabilityInput = {
+  probability: number
+  kind: 'percentage' | 'americanOdds'
+  americanOdds?: number
+}
+
 const clamp = (value: number, minimum: number, maximum: number) => Math.min(maximum, Math.max(minimum, value))
+
+export function parseProbabilityInput(input: string): ParsedProbabilityInput | null {
+  const trimmed = input.trim()
+  if (trimmed === '') return null
+  const hasPercentSign = trimmed.endsWith('%')
+  const numericText = (hasPercentSign ? trimmed.slice(0, -1) : trimmed).trim()
+  if (!/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(numericText)) return null
+
+  const value = Number(numericText)
+  if (!Number.isFinite(value)) return null
+  if (hasPercentSign) return value >= 0 && value <= 100 ? { probability: value / 100, kind: 'percentage' } : null
+
+  const isSigned = numericText.startsWith('+') || numericText.startsWith('-')
+  if (isSigned || value > 100) {
+    if (value === 0) return null
+    const absolute = Math.abs(value)
+    const probability = value > 0 ? 100 / (value + 100) : absolute / (absolute + 100)
+    return { probability, kind: 'americanOdds', americanOdds: value }
+  }
+
+  return value >= 0 && value <= 100 ? { probability: value / 100, kind: 'percentage' } : null
+}
 
 function combinations(total: number, selected: number) {
   const smallerSide = Math.min(selected, total - selected)

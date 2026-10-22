@@ -1,7 +1,7 @@
 import { useMemo, useState, type FormEvent } from 'react'
 import type { Bet, BetInput, BettingLookups, BetPayoutMode, BetTiming, BonusType, PayoutTierInput } from './types'
 import { americanToDecimal, decimalToAmerican, displayEnum, money } from './types'
-import { calculateAllOrNothingKelly, calculateFlexKelly } from './kelly'
+import { calculateAllOrNothingKelly, calculateFlexKelly, parseProbabilityInput } from './kelly'
 import { Field, inputClass, Modal, primaryButton, secondaryButton } from './ui'
 
 type Props = {
@@ -53,6 +53,7 @@ export function BetForm({ bet, lookups, currentBankroll, kellyMultiplier, saving
   const [error, setError] = useState('')
 
   const entryValueNumber = Number(entryValue) || 0
+  const parsedProbability = useMemo(() => parseProbabilityInput(probability), [probability])
   const pricing = useMemo(() => {
     const value = Number(pricingValue)
     if (!Number.isFinite(value) || value === 0 || entryValueNumber <= 0) return { decimal: null, payout: null }
@@ -62,8 +63,8 @@ export function BetForm({ bet, lookups, currentBankroll, kellyMultiplier, saving
   }, [entryValueNumber, oddsMode, pricingValue])
 
   const kelly = useMemo(() => {
-    if (probability === '') return null
-    const winProbability = Number(probability) / 100
+    if (!parsedProbability) return null
+    const winProbability = parsedProbability.probability
     const multiplierNumber = Number(multiplier)
     if (!Number.isFinite(multiplierNumber) || multiplierNumber < 0 || multiplierNumber > 1) return null
     if (payoutMode === 'AllOrNothing') {
@@ -76,7 +77,7 @@ export function BetForm({ bet, lookups, currentBankroll, kellyMultiplier, saving
       requiredCorrectLegs: Number(tier.requiredCorrectLegs),
       finalPayoutAmount: Number(tier.finalPayoutAmount),
     })), currentBankroll ?? 0, multiplierNumber)
-  }, [currentBankroll, entryValueNumber, legCount, multiplier, payoutMode, pricing.decimal, probability, tiers])
+  }, [currentBankroll, entryValueNumber, legCount, multiplier, parsedProbability, payoutMode, pricing.decimal, tiers])
 
   function changeLegCount(value: string) {
     setLegCount(value)
@@ -116,6 +117,7 @@ export function BetForm({ bet, lookups, currentBankroll, kellyMultiplier, saving
     if (!platformId) return setError('Create or select a platform first.')
     if (!Number.isFinite(cost) || cost < 0 || !Number.isFinite(value) || value <= 0) return setError('Enter valid entry cost and entry value amounts.')
     if (!Number.isInteger(legs) || legs < 1) return setError('Number of legs must be at least one.')
+    if (probability.trim() !== '' && !parsedProbability) return setError('Enter a percentage from 0 to 100 or valid American odds such as -120 or +300.')
 
     let payoutTiers: PayoutTierInput[]
     let decimalOdds: number | null
@@ -135,7 +137,7 @@ export function BetForm({ bet, lookups, currentBankroll, kellyMultiplier, saving
       await onSave({
         platformId, sourceId: sourceId || null,
         entryCost: cost, entryValue: value, legCount: legs, payoutMode, decimalOdds,
-        estimatedProbability: probability === '' ? null : Number(probability) / 100,
+        estimatedProbability: parsedProbability?.probability ?? null,
         timing, placedAtUtc: new Date(placedAt).toISOString(), currencyCode: currencyCode.toUpperCase(), notes: notes.trim() || null,
         bonus: hasBonus ? { type: bonusType, percentage: bonusPercent === '' ? null : Number(bonusPercent) / 100, fixedAmount: numberOrNull(bonusAmount), description: bonusDescription.trim() || null } : null,
         payoutTiers,
@@ -160,7 +162,10 @@ export function BetForm({ bet, lookups, currentBankroll, kellyMultiplier, saving
             <Field label="Bet timing"><div className="mt-1.5 grid grid-cols-2 rounded-xl border border-white/15 bg-slate-950/70 p-1">{(['Pregame', 'Live'] as BetTiming[]).map(value => <button key={value} type="button" onClick={() => setTiming(value)} className={`rounded-lg px-3 py-2 text-sm font-semibold ${timing === value ? 'bg-emerald-400 text-emerald-950' : 'text-slate-400'}`}>{value}</button>)}</div></Field>
             <Field label="Currency"><input maxLength={3} className={inputClass} value={currencyCode} onChange={e => setCurrencyCode(e.target.value)} /></Field>
           </div>
-          <Field label={payoutMode === 'Flex' ? 'Estimated probability all legs hit' : 'Your estimated bet win probability'} hint={payoutMode === 'Flex' ? 'Enter the full-entry probability from OddsJam. Equal independent per-leg rates are derived from it.' : 'Optional. Enter a percentage such as 42.5.'}><div className="relative"><input min="0" max="100" step="0.01" type="number" className={`${inputClass} pr-9`} value={probability} onChange={e => setProbability(e.target.value)} /><span className="absolute right-3 top-4 text-sm text-slate-500">%</span></div></Field>
+          <Field label={payoutMode === 'Flex' ? 'Estimated probability or odds all legs hit' : 'Estimated bet win probability or odds'} hint={payoutMode === 'Flex' ? 'Enter OddsJam’s full-entry percentage or American odds. Equal independent per-leg rates are derived from it.' : 'Enter a percentage or American odds, such as 42.5%, -120, or +300.'}>
+            <input type="text" className={inputClass} placeholder="42.5% or -120" value={probability} onChange={e => setProbability(e.target.value)} />
+            {probability.trim() !== '' && <span aria-live="polite" className={`mt-1.5 block text-xs ${parsedProbability ? 'text-emerald-300' : 'text-rose-300'}`}>{parsedProbability ? parsedProbability.kind === 'americanOdds' ? `${(parsedProbability.americanOdds ?? 0) > 0 ? '+' : ''}${parsedProbability.americanOdds} American odds = ${(parsedProbability.probability * 100).toFixed(2)}% implied probability` : `${(parsedProbability.probability * 100).toFixed(2)}% probability` : 'Enter 0–100% or American odds such as -120 or +300.'}</span>}
+          </Field>
           {bet && <Field label="Notes"><textarea rows={3} maxLength={2000} className={inputClass} placeholder="What made this bet interesting?" value={notes} onChange={e => setNotes(e.target.value)} /></Field>}
         </section>
 

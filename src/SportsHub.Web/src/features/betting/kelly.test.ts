@@ -1,7 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { binomialProbability, calculateAllOrNothingKelly, calculateFlexKelly, optimalKellyFraction } from './kelly'
+import { binomialProbability, calculateAllOrNothingKelly, calculateFlexKelly, optimalKellyFraction, parseProbabilityInput } from './kelly'
 
 describe('Kelly calculator', () => {
+  it.each([
+    ['42.5', 0.425, 'percentage'],
+    ['42.5%', 0.425, 'percentage'],
+    ['-120', 120 / 220, 'americanOdds'],
+    ['+300', 0.25, 'americanOdds'],
+    ['300', 0.25, 'americanOdds'],
+    ['100', 1, 'percentage'],
+    ['+100', 0.5, 'americanOdds'],
+  ])('recognizes probability input %s', (input, expected, kind) => {
+    const parsed = parseProbabilityInput(input)
+
+    expect(parsed?.probability).toBeCloseTo(expected as number, 10)
+    expect(parsed?.kind).toBe(kind)
+  })
+
+  it.each(['', 'not odds', '101%', '+0', '-0'])('rejects invalid probability input %s', input => {
+    expect(parseProbabilityInput(input)).toBeNull()
+  })
+
   it('calculates the standard all-or-nothing Kelly fraction', () => {
     const result = calculateAllOrNothingKelly(0.55, 2, 1_000, 0.25)
 
