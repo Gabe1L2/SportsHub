@@ -39,7 +39,8 @@ export type Bet = {
 }
 
 export type BettingSummary = { totalBets: number; pendingBets: number; totalEntryCost: number; netProfit: number; roi: number | null }
-export type BetListResponse = { summary: BettingSummary; items: Bet[]; totalCount: number; page: number; pageSize: number }
+export type PlatformBetCount = { platformId: string; platformName: string; count: number }
+export type BetListResponse = { summary: BettingSummary; items: Bet[]; platformCounts: PlatformBetCount[]; totalCount: number; page: number; pageSize: number }
 
 export type BankrollTransaction = {
   id: string

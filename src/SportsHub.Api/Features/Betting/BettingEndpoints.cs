@@ -71,7 +71,8 @@ public sealed record BetResponse(
     IReadOnlyList<BetPayoutTierResponse> PayoutTiers);
 
 public sealed record BettingSummaryResponse(int TotalBets, int PendingBets, decimal TotalEntryCost, decimal NetProfit, decimal? Roi);
-public sealed record BetListResponse(BettingSummaryResponse Summary, IReadOnlyList<BetResponse> Items, int TotalCount, int Page, int PageSize);
+public sealed record PlatformBetCountResponse(Guid PlatformId, string PlatformName, int Count);
+public sealed record BetListResponse(BettingSummaryResponse Summary, IReadOnlyList<BetResponse> Items, IReadOnlyList<PlatformBetCountResponse> PlatformCounts, int TotalCount, int Page, int PageSize);
 public sealed record BettingLookupsResponse(IReadOnlyList<PlatformResponse> Platforms, IReadOnlyList<SourceResponse> Sources);
 
 public static class BettingEndpoints
@@ -120,8 +121,17 @@ public static class BettingEndpoints
         }
         if (query.Status is not null) bets = bets.Where(x => x.Status == query.Status);
         if (query.Timing is not null) bets = bets.Where(x => x.Timing == query.Timing);
-        if (query.PlatformId is not null) bets = bets.Where(x => x.PlatformId == query.PlatformId);
         if (query.SourceId is not null) bets = bets.Where(x => x.SourceId == query.SourceId);
+
+        List<PlatformBetCountResponse> platformCounts = query.Status == BetStatus.Pending
+            ? await bets.GroupBy(x => new { x.PlatformId, x.Platform.Name })
+                .Select(group => new PlatformBetCountResponse(group.Key.PlatformId, group.Key.Name, group.Count()))
+                .OrderByDescending(x => x.Count)
+                .ThenBy(x => x.PlatformName)
+                .ToListAsync(cancellationToken)
+            : [];
+
+        if (query.PlatformId is not null) bets = bets.Where(x => x.PlatformId == query.PlatformId);
         bets = query.Sort switch
         {
             "placedAsc" => bets.OrderBy(x => x.PlacedAtUtc),
@@ -134,7 +144,7 @@ public static class BettingEndpoints
         var totalCount = await bets.CountAsync(cancellationToken);
         var items = await bets.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
         var summary = await BuildSummaryAsync(userId, db, cancellationToken);
-        return Results.Ok(new BetListResponse(summary, items.Select(ToResponse).ToArray(), totalCount, page, pageSize));
+        return Results.Ok(new BetListResponse(summary, items.Select(ToResponse).ToArray(), platformCounts, totalCount, page, pageSize));
     }
 
     private static async Task<IResult> GetBetAsync(Guid id, ClaimsPrincipal principal, SportsHubDbContext db, CancellationToken cancellationToken)

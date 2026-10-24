@@ -69,6 +69,7 @@ export function BettingPage() {
   const summary = bets.data?.summary
   const totalPages = Math.max(1, Math.ceil((bets.data?.totalCount ?? 0) / pageSize))
   const filtered = filters.search || filters.status || filters.timing || filters.platformId || filters.sourceId
+  const pendingPlatformTotal = bets.data?.platformCounts.reduce((total, platform) => total + platform.count, 0) ?? 0
   return <section>
     <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
       <div><p className="text-xs font-bold uppercase tracking-[.22em] text-emerald-300 sm:text-sm">Sports betting</p><h1 className="mt-2 text-4xl font-black tracking-tight md:text-5xl">Bet tracker</h1><p className="mt-3 max-w-2xl text-sm text-slate-400 sm:text-base">Capture the offer, settle the result, and understand the numbers behind every entry.</p></div>
@@ -95,6 +96,14 @@ export function BettingPage() {
       </div>
       <div className={`${filtersOpen ? 'flex' : 'hidden'} mt-3 flex-wrap items-center justify-between gap-3 md:flex`}><label className="flex cursor-pointer items-center gap-2 text-sm text-slate-400"><input type="checkbox" className="accent-emerald-400" checked={filters.archived} onChange={e => setFilter('archived', e.target.checked)} />Show archived bets</label>{filtered && <button className="text-xs font-semibold text-emerald-300 hover:text-emerald-200" onClick={() => setFilters(current => ({ ...initialFilters, archived: current.archived }))}>Clear filters</button>}</div>
     </div>
+
+    {filters.status === 'Pending' && !bets.isLoading && !bets.error && <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-400/[.05] p-3 sm:p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2"><div><p className="text-xs font-bold uppercase tracking-[.16em] text-amber-300">Open by platform</p><p className="mt-1 text-xs text-slate-500">{pendingPlatformTotal.toLocaleString()} pending {pendingPlatformTotal === 1 ? 'bet' : 'bets'} across {bets.data?.platformCounts.length ?? 0} {(bets.data?.platformCounts.length ?? 0) === 1 ? 'platform' : 'platforms'}</p></div>{filters.platformId && <button type="button" className="text-xs font-semibold text-amber-200 hover:text-amber-100" onClick={() => setFilter('platformId', '')}>Show all</button>}</div>
+      {(bets.data?.platformCounts.length ?? 0) > 0 ? <div className="mt-3 flex flex-wrap gap-2">{bets.data?.platformCounts.map(platform => {
+        const selected = filters.platformId === platform.platformId
+        return <button key={platform.platformId} type="button" aria-pressed={selected} onClick={() => setFilter('platformId', selected ? '' : platform.platformId)} className={`rounded-xl border px-3 py-2 text-left transition ${selected ? 'border-amber-300/60 bg-amber-300 text-amber-950' : 'border-white/10 bg-white/[.04] text-slate-200 hover:border-amber-300/30 hover:bg-amber-300/10'}`}><span className="text-sm font-semibold">{platform.platformName}</span><span className={`ml-2 rounded-md px-1.5 py-0.5 text-xs font-black tabular-nums ${selected ? 'bg-amber-950/15' : 'bg-amber-300/10 text-amber-200'}`}>{platform.count}</span></button>
+      })}</div> : <p className="mt-3 text-sm text-slate-400">No open bets match these filters.</p>}
+    </div>}
 
     {actionError && <p className="mt-4 rounded-xl bg-rose-400/10 px-4 py-3 text-sm text-rose-200">{actionError}</p>}
     <div className="mt-5">
