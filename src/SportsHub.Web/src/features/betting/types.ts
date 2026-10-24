@@ -59,6 +59,7 @@ export type BettingFinanceSummary = {
   totalWithdrawals: number
   netCashFlow: number
   totalAdjustments: number
+  pendingBetExposure: number
   currentBankroll: number
   totalToolCosts: number
   overallProfitAfterTools: number

@@ -49,4 +49,18 @@ public sealed class BettingFinanceTests
 
         Assert.Equal(615m, balance);
     }
+
+    [Fact]
+    public void AvailableBankrollSubtractsCashTiedUpInPendingBets()
+    {
+        var balance = BettingFinanceMath.CurrentSportsBankroll(
+            betProfit: 250m,
+            fantasyProfit: -40m,
+            deposits: 500m,
+            withdrawals: 100m,
+            adjustments: 5m,
+            pendingBetExposure: 125m);
+
+        Assert.Equal(490m, balance);
+    }
 }

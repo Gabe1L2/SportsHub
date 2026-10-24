@@ -31,6 +31,7 @@ public sealed record BettingFinanceSummaryResponse(
     decimal TotalWithdrawals,
     decimal NetCashFlow,
     decimal TotalAdjustments,
+    decimal PendingBetExposure,
     decimal CurrentBankroll,
     decimal TotalToolCosts,
     decimal OverallProfitAfterTools);
@@ -247,6 +248,9 @@ public static class BettingFinanceEndpoints
         var betProfit = await db.Bets.AsNoTracking()
             .Where(x => x.UserId == userId && x.Status != BetStatus.Pending && x.ActualPayout != null)
             .SumAsync(x => (decimal?)(x.ActualPayout!.Value - x.EntryCost), cancellationToken) ?? 0m;
+        var pendingBetExposure = await db.Bets.AsNoTracking()
+            .Where(x => x.UserId == userId && x.Status == BetStatus.Pending)
+            .SumAsync(x => (decimal?)x.EntryCost, cancellationToken) ?? 0m;
         var deposits = await db.BankrollTransactions.AsNoTracking()
             .Where(x => x.UserId == userId && x.Type == BankrollTransactionType.Deposit)
             .SumAsync(x => (decimal?)(x.Amount < 0m ? -x.Amount : x.Amount), cancellationToken) ?? 0m;
@@ -276,7 +280,8 @@ public static class BettingFinanceEndpoints
             withdrawals,
             netCashFlow,
             adjustments,
-            BettingFinanceMath.CurrentSportsBankroll(betProfit, fantasyProfit, deposits, withdrawals, adjustments),
+            pendingBetExposure,
+            BettingFinanceMath.CurrentSportsBankroll(betProfit, fantasyProfit, deposits, withdrawals, adjustments, pendingBetExposure),
             toolCosts,
             BettingFinanceMath.OverallProfitAfterTools(betProfit, toolCosts));
     }

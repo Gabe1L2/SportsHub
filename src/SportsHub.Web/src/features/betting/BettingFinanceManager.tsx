@@ -35,8 +35,9 @@ export function BettingFinanceManager({ lookups, onClose }: { lookups: BettingLo
   return <Modal title="Bankroll & costs" description="Track cash movement, reconcile your real balance, and include tools in all-in profit." onClose={onClose} wide>
     <div className="p-4 sm:p-6">
       {finance.isLoading ? <div className="h-48 animate-pulse rounded-2xl bg-white/5" /> : finance.error ? <p className="rounded-xl bg-rose-400/10 p-4 text-sm text-rose-200">{finance.error.message}</p> : <>
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-          <FinanceStat label="Current bankroll" value={money(summary?.currentBankroll)} tone="positive" />
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+          <FinanceStat label="Available bankroll" value={money(summary?.currentBankroll)} tone={(summary?.currentBankroll ?? 0) >= 0 ? 'positive' : 'negative'} />
+          <FinanceStat label="Pending entries" value={money(summary?.pendingBetExposure)} tone="negative" />
           <FinanceStat label="Bet profit" value={money(summary?.betProfit)} />
           <FinanceStat label="Tool costs" value={money(summary?.totalToolCosts)} tone="negative" />
           <FinanceStat label="Profit after tools" value={money(summary?.overallProfitAfterTools)} tone={(summary?.overallProfitAfterTools ?? 0) >= 0 ? 'positive' : 'negative'} />

@@ -80,7 +80,7 @@ export function BettingPage() {
       <SummaryCard label="Cash entered" value={summary ? money(summary.totalEntryCost) : '—'} detail="Active history" />
       <SummaryCard label="Net profit" value={summary ? money(summary.netProfit) : '—'} detail="Settled bets" tone={(summary?.netProfit ?? 0) >= 0 ? 'positive' : 'negative'} />
       <SummaryCard label="ROI" value={summary ? percent(summary.roi) : '—'} detail="On settled cash cost" tone={(summary?.roi ?? 0) >= 0 ? 'positive' : 'negative'} />
-      <SummaryCard label="Current bankroll" value={financeSummary.data ? money(financeSummary.data.currentBankroll) : '—'} detail="Across all platforms" tone={(financeSummary.data?.currentBankroll ?? 0) >= 0 ? 'positive' : 'negative'} />
+      <SummaryCard label="Available bankroll" value={financeSummary.data ? money(financeSummary.data.currentBankroll) : '—'} detail={financeSummary.data ? `${money(financeSummary.data.pendingBetExposure)} tied up in pending bets` : 'Across all platforms'} tone={(financeSummary.data?.currentBankroll ?? 0) >= 0 ? 'positive' : 'negative'} />
       <SummaryCard label="Profit after tools" value={financeSummary.data ? money(financeSummary.data.overallProfitAfterTools) : '—'} detail="Bet profit less tool costs" tone={(financeSummary.data?.overallProfitAfterTools ?? 0) >= 0 ? 'positive' : 'negative'} />
     </div>
 

@@ -156,11 +156,11 @@ public static class BettingFinanceMath
         _ => amount
     };
 
-    public static decimal CurrentBankroll(decimal betProfit, decimal deposits, decimal withdrawals, decimal adjustments) =>
-        betProfit + deposits - withdrawals + adjustments;
+    public static decimal CurrentBankroll(decimal betProfit, decimal deposits, decimal withdrawals, decimal adjustments, decimal pendingBetExposure = 0m) =>
+        betProfit + deposits - withdrawals + adjustments - pendingBetExposure;
 
-    public static decimal CurrentSportsBankroll(decimal betProfit, decimal fantasyProfit, decimal deposits, decimal withdrawals, decimal adjustments) =>
-        betProfit + fantasyProfit + deposits - withdrawals + adjustments;
+    public static decimal CurrentSportsBankroll(decimal betProfit, decimal fantasyProfit, decimal deposits, decimal withdrawals, decimal adjustments, decimal pendingBetExposure = 0m) =>
+        betProfit + fantasyProfit + deposits - withdrawals + adjustments - pendingBetExposure;
 
     public static decimal OverallProfitAfterTools(decimal betProfit, decimal toolCosts) => betProfit - toolCosts;
 }
