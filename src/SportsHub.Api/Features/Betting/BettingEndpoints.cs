@@ -123,13 +123,19 @@ public static class BettingEndpoints
         if (query.Timing is not null) bets = bets.Where(x => x.Timing == query.Timing);
         if (query.SourceId is not null) bets = bets.Where(x => x.SourceId == query.SourceId);
 
-        List<PlatformBetCountResponse> platformCounts = query.Status == BetStatus.Pending
-            ? await bets.GroupBy(x => new { x.PlatformId, x.Platform.Name })
-                .Select(group => new PlatformBetCountResponse(group.Key.PlatformId, group.Key.Name, group.Count()))
+        var platformCounts = new List<PlatformBetCountResponse>();
+        if (query.Status == BetStatus.Pending)
+        {
+            var pendingPlatforms = await bets
+                .Select(x => new { x.PlatformId, PlatformName = x.Platform.Name })
+                .ToListAsync(cancellationToken);
+            platformCounts = pendingPlatforms
+                .GroupBy(x => new { x.PlatformId, x.PlatformName })
+                .Select(group => new PlatformBetCountResponse(group.Key.PlatformId, group.Key.PlatformName, group.Count()))
                 .OrderByDescending(x => x.Count)
                 .ThenBy(x => x.PlatformName)
-                .ToListAsync(cancellationToken)
-            : [];
+                .ToList();
+        }
 
         if (query.PlatformId is not null) bets = bets.Where(x => x.PlatformId == query.PlatformId);
         bets = query.Sort switch
