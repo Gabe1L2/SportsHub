@@ -69,7 +69,7 @@ export function ProfitLossCalendar() {
             const title = day ? `${day.betCount} settled ${day.betCount === 1 ? 'bet' : 'bets'} · ${signedMoney(day.profitLoss, currency)}` : 'No settled bets'
             return <div key={key} title={title} className={`relative min-h-16 p-1.5 sm:min-h-24 sm:p-3 ${tone}`}>
               <span className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full text-[10px] font-semibold sm:h-6 sm:min-w-6 sm:text-xs ${isToday ? 'bg-emerald-300 text-emerald-950' : 'text-slate-400'}`}>{date.getDate()}</span>
-              {day && <div className="mt-1 sm:mt-3"><p className={`truncate text-[9px] font-black tabular-nums sm:text-sm ${day.profitLoss > 0 ? 'text-emerald-300' : day.profitLoss < 0 ? 'text-rose-300' : 'text-slate-400'}`}>{signedCompactMoney(day.profitLoss, currency)}</p><p className="mt-0.5 hidden text-[10px] text-slate-600 sm:block">{day.betCount} {day.betCount === 1 ? 'bet' : 'bets'}</p></div>}
+              {day && <div className="mt-1 sm:mt-3"><p className={`whitespace-nowrap text-[8px] font-black tracking-tight tabular-nums sm:text-sm sm:tracking-normal ${day.profitLoss > 0 ? 'text-emerald-300' : day.profitLoss < 0 ? 'text-rose-300' : 'text-slate-400'}`}><span className="sm:hidden">{signedMobileMoney(day.profitLoss, currency)}</span><span className="hidden sm:inline">{signedCompactMoney(day.profitLoss, currency)}</span></p><p className="mt-0.5 hidden text-[10px] text-slate-600 sm:block">{day.betCount} {day.betCount === 1 ? 'bet' : 'bets'}</p></div>}
             </div>
           })}
         </div>}
@@ -83,5 +83,18 @@ function signedMoney(value: number, currency: string) {
 
 function signedCompactMoney(value: number, currency: string) {
   const formatted = new Intl.NumberFormat(undefined, { style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(value)
+  return `${value > 0 ? '+' : ''}${formatted}`
+}
+
+function signedMobileMoney(value: number, currency: string) {
+  const absolute = Math.abs(value)
+  const formatted = new Intl.NumberFormat(undefined, {
+    style: 'currency',
+    currency,
+    currencyDisplay: 'narrowSymbol',
+    notation: absolute >= 1_000 ? 'compact' : 'standard',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: absolute >= 10 ? 0 : 1,
+  }).format(value)
   return `${value > 0 ? '+' : ''}${formatted}`
 }
