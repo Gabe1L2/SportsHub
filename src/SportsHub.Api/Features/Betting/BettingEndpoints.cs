@@ -20,6 +20,12 @@ public sealed class BetListQuery
     public int PageSize { get; init; } = 20;
 }
 
+public sealed class BetCalendarQuery
+{
+    public DateTime? FromUtc { get; init; }
+    public DateTime? ToUtc { get; init; }
+}
+
 public sealed record BetPayoutTierRequest(int RequiredCorrectLegs, decimal? BasePayoutAmount, decimal FinalPayoutAmount);
 public sealed record BetBonusRequest(BetBonusType Type, decimal? Percentage, decimal? FixedAmount, string? Description);
 public sealed record BetUpsertRequest(
@@ -73,6 +79,8 @@ public sealed record BetResponse(
 public sealed record BettingSummaryResponse(int TotalBets, int PendingBets, decimal TotalEntryCost, decimal NetProfit, decimal? Roi);
 public sealed record PlatformBetCountResponse(Guid PlatformId, string PlatformName, int Count);
 public sealed record BetListResponse(BettingSummaryResponse Summary, IReadOnlyList<BetResponse> Items, IReadOnlyList<PlatformBetCountResponse> PlatformCounts, int TotalCount, int Page, int PageSize);
+public sealed record BetCalendarEntryResponse(Guid Id, DateTime SettledAtUtc, decimal ProfitLoss, string CurrencyCode);
+public sealed record BetCalendarResponse(IReadOnlyList<BetCalendarEntryResponse> Entries);
 public sealed record BettingLookupsResponse(IReadOnlyList<PlatformResponse> Platforms, IReadOnlyList<SourceResponse> Sources);
 
 public static class BettingEndpoints
@@ -82,6 +90,7 @@ public static class BettingEndpoints
         var group = endpoints.MapGroup("/api/betting").WithTags("Betting").RequireAuthorization();
 
         group.MapGet("/summary", GetSummaryAsync);
+        group.MapGet("/calendar", GetCalendarAsync);
         group.MapGet("/bets", GetBetsAsync);
         group.MapGet("/bets/{id:guid}", GetBetAsync);
         group.MapPost("/bets", CreateBetAsync).ValidateAntiforgery();
@@ -151,6 +160,29 @@ public static class BettingEndpoints
         var items = await bets.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync(cancellationToken);
         var summary = await BuildSummaryAsync(userId, db, cancellationToken);
         return Results.Ok(new BetListResponse(summary, items.Select(ToResponse).ToArray(), platformCounts, totalCount, page, pageSize));
+    }
+
+    private static async Task<IResult> GetCalendarAsync(ClaimsPrincipal principal, SportsHubDbContext db, [AsParameters] BetCalendarQuery query, CancellationToken cancellationToken)
+    {
+        if (query.FromUtc is null || query.ToUtc is null)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["dateRange"] = ["Choose a calendar month."] });
+
+        var fromUtc = query.FromUtc.Value.ToUniversalTime();
+        var toUtc = query.ToUtc.Value.ToUniversalTime();
+        if (toUtc <= fromUtc || toUtc - fromUtc > TimeSpan.FromDays(32))
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["dateRange"] = ["The calendar range must be between one and 32 days."] });
+
+        var userId = UserId(principal);
+        var settledBets = await db.Bets.AsNoTracking()
+            .Where(x => x.UserId == userId && x.SettledAtUtc >= fromUtc && x.SettledAtUtc < toUtc && x.ActualPayout != null)
+            .OrderBy(x => x.SettledAtUtc)
+            .Select(x => new { x.Id, SettledAtUtc = x.SettledAtUtc!.Value, ProfitLoss = x.ActualPayout!.Value - x.EntryCost, x.CurrencyCode })
+            .ToListAsync(cancellationToken);
+        var entries = settledBets
+            .Select(x => new BetCalendarEntryResponse(x.Id, AsUtc(x.SettledAtUtc), x.ProfitLoss, x.CurrencyCode))
+            .ToArray();
+
+        return Results.Ok(new BetCalendarResponse(entries));
     }
 
     private static async Task<IResult> GetBetAsync(Guid id, ClaimsPrincipal principal, SportsHubDbContext db, CancellationToken cancellationToken)

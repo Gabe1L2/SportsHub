@@ -6,6 +6,7 @@ import { BetForm } from '../features/betting/BetForm'
 import { BetCsvImporter } from '../features/betting/BetCsvImporter'
 import { BettingFinanceManager } from '../features/betting/BettingFinanceManager'
 import { LookupManager } from '../features/betting/LookupManager'
+import { ProfitLossCalendar } from '../features/betting/ProfitLossCalendar'
 import { SettleDialog } from '../features/betting/SettleDialog'
 import type { Bet, BetInput, BettingFinanceSummary, BettingLookups, BetListResponse, BetStatus, BetTiming } from '../features/betting/types'
 import { displayEnum, money, percent } from '../features/betting/types'
@@ -84,6 +85,8 @@ export function BettingPage() {
       <SummaryCard label="Available bankroll" value={financeSummary.data ? money(financeSummary.data.currentBankroll) : '—'} detail={financeSummary.data ? `${money(financeSummary.data.pendingBetExposure)} tied up in pending bets` : 'Across all platforms'} tone={(financeSummary.data?.currentBankroll ?? 0) >= 0 ? 'positive' : 'negative'} />
       <SummaryCard label="Profit after tools" value={financeSummary.data ? money(financeSummary.data.overallProfitAfterTools) : '—'} detail="Bet profit less tool costs" tone={(financeSummary.data?.overallProfitAfterTools ?? 0) >= 0 ? 'positive' : 'negative'} />
     </div>
+
+    <ProfitLossCalendar />
 
     <div className="mt-6 rounded-2xl border border-white/10 bg-white/[.035] p-3 sm:mt-8 sm:p-4">
       <div className="flex gap-2 md:contents"><input className={`${inputClass.replace('mt-1.5 ', '')} min-w-0 flex-1`} placeholder="Search bets" value={filters.search} onChange={e => setFilter('search', e.target.value)} /><button type="button" className={`${secondaryButton} shrink-0 md:hidden`} onClick={() => setFiltersOpen(open => !open)}>Filters{filtered ? ' •' : ''} {filtersOpen ? '▲' : '▼'}</button></div>

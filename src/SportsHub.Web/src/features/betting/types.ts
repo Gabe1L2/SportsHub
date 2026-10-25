@@ -41,6 +41,8 @@ export type Bet = {
 export type BettingSummary = { totalBets: number; pendingBets: number; totalEntryCost: number; netProfit: number; roi: number | null }
 export type PlatformBetCount = { platformId: string; platformName: string; count: number }
 export type BetListResponse = { summary: BettingSummary; items: Bet[]; platformCounts: PlatformBetCount[]; totalCount: number; page: number; pageSize: number }
+export type BetCalendarEntry = { id: string; settledAtUtc: string; profitLoss: number; currencyCode: string }
+export type BetCalendarResponse = { entries: BetCalendarEntry[] }
 
 export type BankrollTransaction = {
   id: string
